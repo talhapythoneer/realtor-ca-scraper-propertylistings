@@ -1,0 +1,56 @@
+# realtor.ca scraper configuration
+# Edit values here to change scraper behaviour without touching the code.
+
+scrape:
+  headless: false              # MUST stay false - confirmed in testing that realtor.ca's bot protection
+                               # blocks even the first page load in headless mode under this browser.
+  page_load_timeout_ms: 45000
+  nav_retry_count: 3           # retries for a page/navigation before giving up on that page
+  delay_between_pages_seconds: [3, 6]     # random delay range between result-list pages
+  delay_between_listings_seconds: [2, 5]  # random delay range between listing detail pages
+  max_pages_per_search: 40     # safety cap per city, per run
+  max_listings_per_city: 600   # safety cap per city, per run
+  consecutive_seen_to_stop: 20 # results are newest-first; after this many already-scraped
+                                # listings in a row, assume the rest are old too and move on
+  default_days_back: 7         # "listed since" window in days, used when a row leaves days_back blank
+  sort: "6-D"                  # 6-D = newest listed first (matches realtor.ca's own default for this use case)
+  transaction_type_id: 2       # 2 = For Sale
+  property_type_group_id: 1    # 1 = Residential
+  currency: "CAD"
+  fetch_listing_details: true  # visit each new listing's page for full address/agent/brokerage/description
+  user_agent: ""                # blank = let undetected_chromedriver pick its own matched Chrome UA
+
+# Proxy support - OFF for now (per project scope). Flip `enabled: true` and fill in
+# the fields below once a residential/rotating proxy subscription is purchased.
+proxy:
+  enabled: false
+  provider: ""          # e.g. "brightdata", "smartproxy", "oxylabs"
+  server: ""            # e.g. "http://gateway.provider.com:7000"
+  username: ""
+  password: ""
+
+# Placeholder for the future AI-assisted listing filter discussed with the client
+# (using photos and/or description text to drop teardown/vacant/land-only listings
+# with higher accuracy than plain keyword matching). OFF for now.
+ai_filter:
+  enabled: false
+  provider: ""            # e.g. "openai", "anthropic", "local"
+  api_key_env: "AI_FILTER_API_KEY"   # name of an environment variable holding the API key (never put keys in this file)
+  model: ""
+  confidence_threshold: 0.7
+
+output:
+  formats: ["csv", "xlsx"]
+  output_dir: "output"
+  master_filename_template: "{region}_master.{ext}"
+  fresh_filename_template: "{region}_fresh_{timestamp}.{ext}"
+  excluded_log_filename: "excluded_listings_log.csv"
+  timestamp_format: "%Y-%m-%d_%H%M%S"
+
+geo:
+  cache_file: "data/geo_cache.json"
+  force_refresh: false     # true = ignore cache and re-resolve every city's map location
+
+logging:
+  log_dir: "logs"
+  level: "INFO"            # DEBUG | INFO | WARNING | ERROR

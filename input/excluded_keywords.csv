@@ -1,0 +1,103 @@
+keyword,match_field,active,notes
+investment opportunity,description,Y,From client call - exclude investor-targeted listings
+opportunity for investors,description,Y,From client call - covers "great opportunity for investors" and similar phrasing
+opportunities for investors,description,Y,Plural form - e.g. "great opportunities for investors" (seen on a real sample listing)
+calling all investors,description,Y,Common investor-targeted phrasing
+calling all builders,description,Y,Common teardown/builder-targeted phrasing
+investor alert,description,Y,Common investor-targeted phrasing
+land assembly,description,Y,Land-only / development listings
+vacant land,description,Y,Land only - not a livable home
+vacant lot,description,Y,Land only - not a livable home
+building lot,description,Y,Land only - not a livable home
+lot for sale,description,Y,Land only - not a livable home
+tear down,description,Y,Old home meant to be demolished
+tear-down,description,Y,Old home meant to be demolished
+teardown,description,Y,Old home meant to be demolished
+redevelopment opportunity,description,Y,Old home meant to be demolished / rebuilt
+development opportunity,description,Y,Old home meant to be demolished / rebuilt
+development site,description,Y,"Land / site only, not a livable home"
+value in the land,description,Y,Signals the home itself is not the value driver
+never occupied,description,Y,Client negative keyword list - 2026-09-21
+never lived in,description,Y,Client negative keyword list - 2026-09-21
+currently vacant,description,Y,Client negative keyword list - 2026-09-21
+now vacant,description,Y,Client negative keyword list - 2026-09-21
+home is vacant,description,Y,Client negative keyword list - 2026-09-21
+property is vacant,description,Y,Client negative keyword list - 2026-09-21
+vacant home,description,Y,Client negative keyword list - 2026-09-21
+vacant unit,description,Y,Client negative keyword list - 2026-09-21
+vacant and ready,description,Y,Client negative keyword list - 2026-09-21
+unoccupied,description,Y,Client negative keyword list - 2026-09-21
+owner has moved out,description,Y,Client negative keyword list - 2026-09-21
+sellers have moved out,description,Y,Client negative keyword list - 2026-09-21
+pre-construction,description,Y,Client negative keyword list - 2026-09-21
+to be built,description,Y,Client negative keyword list - 2026-09-21
+not yet built,description,Y,Client negative keyword list - 2026-09-21
+currently under construction,description,Y,Client negative keyword list - 2026-09-21
+construction has not started,description,Y,Client negative keyword list - 2026-09-21
+estimated completion,description,Y,Client negative keyword list - 2026-09-21
+anticipated completion,description,Y,Client negative keyword list - 2026-09-21
+builder-proposed completion,description,Y,Client negative keyword list - 2026-09-21
+tentative possession timeframe,description,Y,Client negative keyword list - 2026-09-21
+possession from the builder,description,Y,Client negative keyword list - 2026-09-21
+choose your finishes,description,Y,Client negative keyword list - 2026-09-21
+select your colours,description,Y,Client negative keyword list - 2026-09-21
+photos are not of the actual home,description,Y,Client negative keyword list - 2026-09-21
+photos are not of the actual property,description,Y,Client negative keyword list - 2026-09-21
+renderings are for illustration purposes,description,Y,Client negative keyword list - 2026-09-21
+raw land,description,Y,Client negative keyword list - 2026-09-21
+serviced lot,description,Y,Client negative keyword list - 2026-09-21
+land only,description,Y,Client negative keyword list - 2026-09-21
+lot only,description,Y,Client negative keyword list - 2026-09-21
+land sale only,description,Y,Client negative keyword list - 2026-09-21
+lot sale only,description,Y,Client negative keyword list - 2026-09-21
+parcel of land,description,Y,Client negative keyword list - 2026-09-21
+build your dream home,description,Y,Client negative keyword list - 2026-09-21
+no dwelling,description,Y,Client negative keyword list - 2026-09-21
+no residence on the property,description,Y,Client negative keyword list - 2026-09-21
+land value,description,Y,Client negative keyword list - 2026-09-21
+lot value,description,Y,Client negative keyword list - 2026-09-21
+value is in the land,description,Y,Client negative keyword list - 2026-09-21
+value lies in the land,description,Y,Client negative keyword list - 2026-09-21
+no value attributed to the improvements,description,Y,Client negative keyword list - 2026-09-21
+no value assigned to the home,description,Y,Client negative keyword list - 2026-09-21
+no value assigned to the house,description,Y,Client negative keyword list - 2026-09-21
+no value assigned to the building,description,Y,Client negative keyword list - 2026-09-21
+no value assigned to the structure,description,Y,Client negative keyword list - 2026-09-21
+no value in the existing home,description,Y,Client negative keyword list - 2026-09-21
+no value in the existing house,description,Y,Client negative keyword list - 2026-09-21
+no value in the existing structure,description,Y,Client negative keyword list - 2026-09-21
+considered a tear-down,description,Y,Client negative keyword list - 2026-09-21
+considered a teardown,description,Y,Client negative keyword list - 2026-09-21
+tear-down property,description,Y,Client negative keyword list - 2026-09-21
+teardown property,description,Y,Client negative keyword list - 2026-09-21
+tear down the existing home,description,Y,Client negative keyword list - 2026-09-21
+tear down the existing house,description,Y,Client negative keyword list - 2026-09-21
+knock down the house,description,Y,Client negative keyword list - 2026-09-21
+knock down the home,description,Y,Client negative keyword list - 2026-09-21
+ready to be demolished,description,Y,Client negative keyword list - 2026-09-21
+ready for demolition,description,Y,Client negative keyword list - 2026-09-21
+demolition-ready,description,Y,Client negative keyword list - 2026-09-21
+demolish the existing home,description,Y,Client negative keyword list - 2026-09-21
+demolish the existing house,description,Y,Client negative keyword list - 2026-09-21
+must be demolished,description,Y,Client negative keyword list - 2026-09-21
+scraper property,description,Y,Client negative keyword list - 2026-09-21
+uninhabitable,description,Y,Client negative keyword list - 2026-09-21
+not habitable,description,Y,Client negative keyword list - 2026-09-21
+unsafe to enter,description,Y,Client negative keyword list - 2026-09-21
+unsafe to occupy,description,Y,Client negative keyword list - 2026-09-21
+condemned,description,Y,Client negative keyword list - 2026-09-21
+boarded up,description,Y,Client negative keyword list - 2026-09-21
+structure has no value,description,Y,Client negative keyword list - 2026-09-21
+no utilities connected,description,Y,Client negative keyword list - 2026-09-21
+land assemblage,description,Y,Client negative keyword list - 2026-09-21
+builder alert,description,Y,Client negative keyword list - 2026-09-21
+builders alert,description,Y,Client negative keyword list - 2026-09-21
+developer alert,description,Y,Client negative keyword list - 2026-09-21
+developers alert,description,Y,Client negative keyword list - 2026-09-21
+shovel-ready development,description,Y,Client negative keyword list - 2026-09-21
+highest and best use is redevelopment,description,Y,Client negative keyword list - 2026-09-21
+approved development permit,description,Y,Client negative keyword list - 2026-09-21
+approved plans for a 4-plex,description,Y,Client negative keyword list - 2026-09-21
+approved plans for a 6-plex,description,Y,Client negative keyword list - 2026-09-21
+approved plans for an 8-plex,description,Y,Client negative keyword list - 2026-09-21
+approved plans for multi-family development,description,Y,Client negative keyword list - 2026-09-21

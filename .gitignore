@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+logs/*.log
+output/*.csv
+output/*.xlsx
+data/geo_cache.json
+.env

@@ -25,6 +25,15 @@ from pathlib import Path
 from tempfile import mkdtemp
 from typing import List, Tuple
 from urllib.parse import urlparse
+import chrome_version
+
+# Fetch the local Chrome version
+current_version = chrome_version.get_chrome_version().split('.')[0]
+current_version = int(current_version)
+
+print({
+    'current_version': current_version
+})
 
 import undetected_chromedriver as uc
 
@@ -132,7 +141,7 @@ def launch_browser(config: dict):
             "setting headless: false in config.yaml for real runs."
         )
 
-    driver = uc.Chrome(options=options, headless=headless)
+    driver = uc.Chrome(options=options, headless=headless, version_main=current_version)
     page_load_timeout_s = scrape_cfg.get("page_load_timeout_ms", 45000) / 1000
     driver.set_page_load_timeout(page_load_timeout_s)
 

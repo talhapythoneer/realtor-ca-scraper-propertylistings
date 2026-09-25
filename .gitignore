@@ -7,3 +7,5 @@ output/*.csv
 output/*.xlsx
 data/geo_cache.json
 .env
+.claude/
+delivery.txt

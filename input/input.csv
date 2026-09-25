@@ -1,44 +1,44 @@
-region,city,seo_slug,province,price_min,price_max,days_back,active,notes
-Greater Calgary,Calgary,,AB,800000,,,Y,Verified: realtor.ca/ab/calgary/real-estate
-Greater Calgary,Okotoks,,AB,700000,,,Y,
-Greater Calgary,Cochrane,,AB,700000,,,Y,
-Greater Calgary,Airdrie,,AB,700000,,,Y,
-Greater Calgary,Chestermere,,AB,700000,,,Y,
-Greater Calgary,High River,,AB,700000,,,Y,Verified: realtor.ca/ab/high-river/real-estate
-Greater Calgary,Diamond Valley,,AB,700000,,,Y,"VERIFY: recently amalgamated town (ex Black Diamond/Turner Valley) - confirm slug on realtor.ca before running, set seo_slug if different"
-Greater Calgary,Bragg Creek,,AB,700000,,,Y,
-Greater Calgary,Strathmore,,AB,700000,,,Y,
-Greater Calgary,Crossfield,,AB,700000,,,Y,
-Greater Calgary,Langdon,,AB,700000,,,Y,VERIFY: may fall under Rocky View County rather than its own realtor.ca city page
-Metro Vancouver,Vancouver,,BC,1500000,,,Y,
-Metro Vancouver,Burnaby,,BC,1500000,,,Y,
-Metro Vancouver,Richmond,,BC,1500000,,,Y,
-Metro Vancouver,North Vancouver City,north-vancouver,BC,1500000,,,Y,"VERIFY: City vs District of North Vancouver may not have separate realtor.ca slugs - confirm and set seo_slug for each"
-Metro Vancouver,North Vancouver District,north-vancouver,BC,1500000,,,Y,"VERIFY: same as above - if slug collides with City row, use PGeoIds override or a search-result-level filter instead"
-Metro Vancouver,West Vancouver,,BC,1500000,,,Y,
-Metro Vancouver,Delta,,BC,1500000,,,Y,
-Metro Vancouver,White Rock,,BC,1500000,,,Y,
-Metro Vancouver,Surrey,,BC,1500000,,,Y,
-Metro Vancouver,Coquitlam,,BC,1500000,,,Y,
-Metro Vancouver,Anmore,,BC,1500000,,,Y,
-Metro Vancouver,Belcarra,,BC,1500000,,,Y,
-Metro Vancouver,Port Moody,,BC,1500000,,,Y,
-Metro Vancouver,New Westminster,,BC,1500000,,,Y,
-Metro Vancouver,Langley City,langley,BC,1500000,,,Y,"VERIFY: City vs Township of Langley may not have separate realtor.ca slugs - confirm and set seo_slug for each"
-Metro Vancouver,Langley Township,langley-township,BC,1500000,,,Y,VERIFY: confirm this slug exists separately from plain 'langley'
-Metro Vancouver,Pitt Meadows,,BC,1500000,,,Y,
-Metro Vancouver,Maple Ridge,,BC,1500000,,,Y,
-Metro Vancouver,Port Coquitlam,,BC,1500000,,,Y,
-Metro Vancouver,Lions Bay,,BC,1500000,,,Y,
-Metro Vancouver,Bowen Island,,BC,1500000,,,Y,
-Vancouver Island,Bowser,,BC,700000,,,Y,
-Vancouver Island,Chemainus,,BC,700000,,,Y,
-Vancouver Island,Courtenay,,BC,700000,,,Y,
-Vancouver Island,Duncan,,BC,700000,,,Y,
-Vancouver Island,Gabriola,gabriola-island,BC,700000,,,Y,VERIFY: realtor.ca may list this as gabriola-island rather than gabriola
-Vancouver Island,Ladysmith,,BC,700000,,,Y,
-Vancouver Island,Lantzville,,BC,700000,,,Y,
-Vancouver Island,Nanaimo,,BC,700000,,,Y,
-Vancouver Island,Nanoose Bay,,BC,700000,,,Y,
-Vancouver Island,Parksville,,BC,700000,,,Y,
-Vancouver Island,Qualicum Beach,,BC,700000,,,Y,
+region,city,seo_slug,province,price_min,price_max,days_back,active
+Greater Calgary,Calgary,calgary,AB,800000,,,Y
+Greater Calgary,Okotoks,okotoks,AB,700000,,,Y
+Greater Calgary,Cochrane,cochrane,AB,700000,,,Y
+Greater Calgary,Airdrie,airdrie,AB,700000,,,Y
+Greater Calgary,Chestermere,chestermere,AB,700000,,,Y
+Greater Calgary,High River,high-river,AB,700000,,,Y
+Greater Calgary,Diamond Valley,diamond-valley,AB,700000,,,Y
+Greater Calgary,Bragg Creek,,AB,700000,,,Y
+Greater Calgary,Strathmore,strathmore,AB,700000,,,Y
+Greater Calgary,Crossfield,crossfield,AB,700000,,,Y
+Greater Calgary,Langdon,,AB,700000,,,Y
+Metro Vancouver,Vancouver,vancouver,BC,1500000,,,Y
+Metro Vancouver,Burnaby,burnaby,BC,1500000,,,Y
+Metro Vancouver,Richmond,richmond,BC,1500000,,,Y
+Metro Vancouver,North Vancouver City,city-of-north-vancouver,BC,1500000,,,Y
+Metro Vancouver,North Vancouver District,district-of-north-vancouver,BC,1500000,,,Y
+Metro Vancouver,West Vancouver,west-vancouver,BC,1500000,,,Y
+Metro Vancouver,Delta,delta,BC,1500000,,,Y
+Metro Vancouver,White Rock,white-rock,BC,1500000,,,Y
+Metro Vancouver,Surrey,surrey,BC,1500000,,,Y
+Metro Vancouver,Coquitlam,coquitlam,BC,1500000,,,Y
+Metro Vancouver,Anmore,anmore,BC,1500000,,,Y
+Metro Vancouver,Belcarra,belcarra,BC,1500000,,,Y
+Metro Vancouver,Port Moody,port-moody,BC,1500000,,,Y
+Metro Vancouver,New Westminster,new-westminster,BC,1500000,,,Y
+Metro Vancouver,Langley City,city-of-langley,BC,1500000,,,Y
+Metro Vancouver,Langley Township,township-of-langley,BC,1500000,,,Y
+Metro Vancouver,Pitt Meadows,pitt-meadows,BC,1500000,,,Y
+Metro Vancouver,Maple Ridge,maple-ridge,BC,1500000,,,Y
+Metro Vancouver,Port Coquitlam,port-coquitlam,BC,1500000,,,Y
+Metro Vancouver,Lions Bay,lions-bay,BC,1500000,,,Y
+Metro Vancouver,Bowen Island,bowen-island,BC,1500000,,,Y
+Vancouver Island,Bowser,,BC,700000,,,Y
+Vancouver Island,Chemainus,,BC,700000,,,Y
+Vancouver Island,Courtenay,courtenay,BC,700000,,,Y
+Vancouver Island,Duncan,duncan,BC,700000,,,Y
+Vancouver Island,Gabriola,gabriola-island,BC,700000,,,Y
+Vancouver Island,Ladysmith,ladysmith,BC,700000,,,Y
+Vancouver Island,Lantzville,lantzville,BC,700000,,,Y
+Vancouver Island,Nanaimo,nanaimo,BC,700000,,,Y
+Vancouver Island,Nanoose Bay,nanoose-bay,BC,700000,,,Y
+Vancouver Island,Parksville,parksville,BC,700000,,,Y
+Vancouver Island,Qualicum Beach,qualicum-beach,BC,700000,,,Y

@@ -7,7 +7,7 @@ scrape:
   page_load_timeout_ms: 45000
   nav_retry_count: 3           # retries for a page/navigation before giving up on that page
   delay_between_pages_seconds: [3, 6]     # random delay range between result-list pages
-  delay_between_listings_seconds: [2, 5]  # random delay range between listing detail pages
+  delay_between_listings_seconds: [1, 1]  # pause after loading a listing page in the browser
   max_pages_per_search: 40     # safety cap per city, per run
   max_listings_per_city: 600   # safety cap per city, per run
   consecutive_seen_to_stop: 20 # results are newest-first; after this many already-scraped
@@ -18,6 +18,17 @@ scrape:
   property_type_group_id: 1    # 1 = Residential
   currency: "CAD"
   fetch_listing_details: true  # visit each new listing's page for full address/agent/brokerage/description
+  detail_fetch_method: "http"  # "http" = fetch listing pages with curl_cffi, reusing the browser's cookies/headers (fast);
+                               # "browser" = load each listing page in the browser, one at a time (slow, old behaviour)
+  http_max_requests_per_minute: 50  # shared across all workers. realtor.ca's Cloudflare rate limit was measured at
+                                    # ~60/min - above that, every request gets a 429 "Security Check" for ~1 minute
+  http_concurrency: 2          # parallel HTTP workers; the per-minute cap above is what really sets the speed
+  http_cooldown_seconds: 90    # after a 429 challenge, pause HTTP this long (the browser keeps fetching meanwhile)
+  http_timeout_seconds: 30
+  http_max_consecutive_failures: 5  # after this many non-challenge HTTP failures in a row, use the browser for the
+                                    # rest of that city
+  http_impersonate: "chrome"   # TLS fingerprint curl_cffi imitates ("chrome" = newest it supports) - realtor.ca
+                               # rejects plain httpx/requests handshakes even with valid browser cookies
   user_agent: ""                # blank = let undetected_chromedriver pick its own matched Chrome UA
 
 # Proxy support - OFF for now (per project scope). Flip `enabled: true` and fill in
@@ -29,7 +40,7 @@ proxy:
   username: ""
   password: ""
 
-# Placeholder for the future AI-assisted listing filter discussed with the client
+# Placeholder for the future AI-assisted listing filter discussed with Max
 # (using photos and/or description text to drop teardown/vacant/land-only listings
 # with higher accuracy than plain keyword matching). OFF for now.
 ai_filter:

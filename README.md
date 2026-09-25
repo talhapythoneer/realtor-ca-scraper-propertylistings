@@ -6,10 +6,57 @@ properties (via a keyword list), and writes the results to per-region CSV and
 Excel files - a cumulative **master** file plus a **fresh** file for just
 that run's new listings.
 
+## Quick Start (start here - no technical knowledge needed)
+
+**What this does:** every time you run it, this looks through realtor.ca for
+newly-listed homes in the cities you care about, drops ones that look like
+teardown/land-only/investor listings, and saves the rest into Excel files you
+can open normally.
+
+**The very first time you use it:**
+
+1. Make sure [Python](https://www.python.org/downloads/) and
+   [Google Chrome](https://www.google.com/chrome/) are installed. When
+   installing Python, tick the box that says **"Add Python to PATH"** on the
+   first screen - this matters.
+2. Double-click **`setup.bat`** in this folder. It installs everything the
+   scraper needs and tells you if anything's missing. You only do this once.
+
+**Every time you want new listings:**
+
+1. Double-click **`run_windows.bat`**.
+2. A Chrome window will pop up on its own and start browsing realtor.ca -
+   this is normal, leave it alone and let it run in the background. Depending
+   on how many cities are on the list, it can take anywhere from a few
+   minutes to over an hour.
+3. When it finishes, the black window will print a line starting with
+   `Done.` and then wait for a key press - press any key to close it.
+4. Open the **`output`** folder - your results are waiting there as Excel
+   files, one set per region (e.g. `Greater_Calgary_fresh_2026-09-25_...xlsx`).
+
+**Which file to actually open:** each region gets two kinds of files -
+
+- **`<Region>_master.xlsx`** - every listing ever found for that region,
+  building up over time. This is your permanent record; don't delete it.
+- **`<Region>_fresh_<date-and-time>.xlsx`** - just the new listings from that
+  one run. **This is the file to look at each time** - it's short and it's
+  exactly what's new since last time.
+
+That's the whole routine: run `run_windows.bat` whenever you want fresh
+listings (daily, weekly, whenever suits you), then open that run's newest
+`_fresh_...xlsx` file for each region.
+
+Want to add/remove a city or change a price range? See "Editing
+input/input.csv" below - it's a plain spreadsheet, no code involved. If
+something looks broken, jump to "Troubleshooting" further down, or send the
+`logs` folder to whoever set this up for you.
+
 ## 1. Folder structure
 
 ```
 realtor_ca/
+├── setup.bat                   <- double-click once, the first time only
+├── run_windows.bat             <- double-click every time you want to scrape
 ├── input/
 │   ├── input.csv               <- regions, cities, price filters (edit this to change what gets scraped)
 │   ├── excluded_keywords.csv   <- keywords that mark a listing as land/investor/teardown (edit this to tune filtering)
@@ -18,28 +65,37 @@ realtor_ca/
 ├── data/geo_cache.json         <- created automatically; remembers each city's map location so future runs are faster
 ├── logs/                       <- created automatically; one log file per run
 ├── scraper/                    <- the scraper's Python package (you shouldn't need to edit this)
-└── run_scraper.py              <- the script you actually run
+└── run_scraper.py              <- the script run_windows.bat calls under the hood
 ```
 
 ## 2. One-time setup
 
-Requires Python 3.10+ and Google Chrome installed (the scraper drives it via `undetected_chromedriver` - see §8 for why).
+**Easiest way:** double-click `setup.bat`. It checks that Python and Chrome
+are installed, tells you clearly if something's missing (with a link to get
+it), and installs the rest automatically. See the Quick Start above.
+
+**Manual way** (if you'd rather use a terminal): requires Python 3.10+ and
+Google Chrome installed (the scraper drives Chrome via `undetected_chromedriver`
+- see §8 for why), then:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-That's it - `undetected_chromedriver` downloads and manages its own matching driver binary automatically the first time it runs.
+That's it either way - `undetected_chromedriver` downloads and manages its
+own matching driver binary automatically the first time it runs.
 
 ## 3. Running it
+
+**Easiest way:** double-click `run_windows.bat`. See the Quick Start above.
+
+**Manual way:**
 
 ```bash
 python run_scraper.py
 ```
 
-On Windows you can also just double-click `run_windows.bat`.
-
-Useful options (run `python run_scraper.py --help` for the full list):
+**Advanced options** (open a terminal for these - run `python run_scraper.py --help` for the full list):
 
 | Option | What it does |
 |---|---|
@@ -63,12 +119,11 @@ One row per city. Columns:
 
 - **region** - groups cities into one set of output files (e.g. "Greater Calgary", "Metro Vancouver", "Vancouver Island"). Cities sharing a region name are combined into the same master/fresh files.
 - **city** - display name, used in the output and in logs.
-- **seo_slug** - *usually leave blank.* The scraper derives realtor.ca's URL slug from the city name automatically (e.g. "High River" → "high-river"). Only fill this in if a city fails to resolve or resolves to the wrong place - see Troubleshooting below.
+- **seo_slug** - the realtor.ca URL slug for that city (e.g. "High River" → `high-river`). Filled in explicitly for every city confirmed working; the scraper uses this value as-is rather than re-deriving it from the city name. Leave blank only for a city you haven't verified yet - the scraper will then guess a slug from the city name, which may resolve to the wrong (or no) page - see Troubleshooting below.
 - **province** - two-letter code (AB, BC, ON, ...).
 - **price_min** / **price_max** - the price filter for that city. Leave `price_max` blank for no upper limit.
 - **days_back** - "listed in the last N days" for that city. Leave blank to use `default_days_back` from config.yaml (7, i.e. weekly). Override with `--days-back` on the command line for a one-off catch-up run instead of editing every row.
 - **active** - `Y`/`N`. Set to `N` to temporarily skip a city without deleting the row.
-- **notes** - free text, ignored by the scraper. Some rows are pre-flagged `VERIFY: ...` - see Troubleshooting.
 
 The file already contains the regions/cities/prices from our discussion (Greater Calgary, Metro Vancouver, Vancouver Island). Add, remove, or edit rows freely - no code changes needed to change your target areas.
 
@@ -120,11 +175,12 @@ realtor.ca runs bot-detection (Imperva/Distil-style) in front of both its pages 
 1. **The city-search autocomplete endpoint** (`/Services/Actions.asmx/GetAutocompleteResults`) returns a hard "blocked" response even from a brand-new browser session. This scraper avoids it entirely - city map locations are instead read from realtor.ca's own public SEO landing pages (e.g. `realtor.ca/ab/calgary/real-estate`), which are reliable and don't touch that endpoint at all.
 2. **A browser-fingerprint check** (`/ping.html`), plus a second, stricter version of the same check that fires specifically when a live search executes. Both consistently returned 403 under Playwright - even driving the real installed Chrome binary with fingerprint overrides applied - and no amount of matching real browser behaviour (correct URLs, in-page navigation instead of full reloads) got past it. Switching the whole browser layer to **`undetected_chromedriver` run non-headless** resolved this completely: the exact same script that reliably 403/503'd under Playwright loads fine under it, and searches that never rendered a single result under Playwright return real listings within about a second. **Headless mode still gets blocked immediately, even on the very first page load** - this was confirmed directly in testing, so `scrape.headless: false` in config.yaml is a hard requirement of this specific site's protection, not just a suggestion.
 3. **Pagination beyond page 1 needs a real click, not a URL change.** Once the search-execution block above was solved, a second issue turned up: rewriting `CurrentPage` in the URL hash and re-applying it silently returns page 1's results every time, no matter what page number is requested - confirmed by comparing MLS numbers directly across "pages" and finding them identical. Clicking the site's own visible "next page" control does work (its internal state carries forward context like `GeoIds`/`GeoName` that a hand-built hash doesn't reconstruct), so that's what this scraper does: page 1 is reached via a hash change (to apply price/date/sort filters), and every page after that via a real click on the next-page control, with a check that confirms the listings actually changed before treating a page as successfully loaded.
+4. **Listing detail pages are fetched over plain HTTP, not the browser.** Once pagination for a city is done, the browser is holding a session that has already passed the checks above. The scraper copies that session's cookies (via CDP, including HttpOnly ones) plus the browser's real user agent, `sec-ch-ua` and `Accept-Language` headers into [`curl_cffi`](https://github.com/lexiforest/curl_cffi) HTTP sessions (a `requests`-style client that reproduces Chrome's TLS handshake - plain `httpx`/`requests` were confirmed to get a 403 from realtor.ca even with every browser cookie attached), then fetches that city's new listing pages without the browser. realtor.ca's Cloudflare protection rate-limits listing pages to about 60 a minute. Above that, it answers every request with a 429 "Security Check" page for about a minute, and copying fresh cookies from the browser doesn't lift it early. So all HTTP requests share one rate cap (`scrape.http_max_requests_per_minute`, default 50). If a challenge still comes back, HTTP pauses for `scrape.http_cooldown_seconds` (default 90) while the browser keeps loading listings from the queue, then HTTP resumes with fresh cookies. To go back to browser-only detail fetching, set `scrape.detail_fetch_method: "browser"`.
 
 **Bottom line:** with `undetected_chromedriver` + `headless: false`, live multi-page filtered search has been confirmed working end-to-end in testing - e.g. a real run against Calgary at $800k+ correctly paginated 40 consecutive pages (440 listings) with zero blocks. If you still see it fail:
 
 - Check the log for the specific error - `HTTP 403`/`503` on `ping.html` or a script under `/bundles/js/desktop/` means this protection kicked in for that request specifically, not a bug in the filters.
-- The built-in random delays (`config.yaml` → `scrape.delay_between_pages_seconds` / `scrape.delay_between_listings_seconds`) and retry logic (`nav_retry_count`) exist to ride out transient versions of this - don't remove them.
+- The built-in random delays (`config.yaml` → `scrape.delay_between_pages_seconds` / `scrape.delay_between_listings_seconds` / `scrape.http_max_requests_per_minute`) and retry logic (`nav_retry_count`) exist to ride out transient versions of this - don't remove them.
 - Running all ~40 cities back-to-back in one sitting is more likely to trip a block than spacing runs out or doing a handful of regions at a time.
 - If blocking becomes a recurring problem at full scale despite the above, a **residential/rotating proxy** (see §9) is the fallback that was already scoped and budgeted for this project - a fresh IP identity is the standard fix for session/IP-reputation-based scoring. No code changes are needed to turn one on.
 
@@ -144,14 +200,14 @@ No code changes needed - the browser will route all traffic through it automatic
 
 ## 10. Troubleshooting a specific city
 
-If a city in input.csv fails with an error like *"Could not resolve a map location"* or *"HTTP 404"*:
+A city can silently return zero listings on every run without ever logging an error. realtor.ca falls back to its generic, unscoped map page (still a normal 200 response, not a 404 or a block) for any slug it doesn't recognize as a real city boundary - so a wrong slug looks like "this city just has no new listings" run after run, not like a failure. If a city has gone multiple runs with 0 listings found, or never appears in its region's master file at all, treat it as unresolved and check it manually:
 
-1. Open a browser and search for that city on realtor.ca yourself.
-2. Look at the resulting page's URL - if it's a plain landing page like `realtor.ca/bc/north-vancouver/real-estate`, copy the part between the province and `/real-estate` (here, `north-vancouver`).
-3. Paste that into the `seo_slug` column for that row in input.csv.
-4. Re-run with `--refresh-geo` for that city to force it to re-resolve.
+1. Load `realtor.ca/<province>/<slug>/real-estate` yourself (the URL the scraper is using - `<slug>` is the `seo_slug` column if set, otherwise the city name lowercased with spaces turned into hyphens).
+2. **The URL loading without a 404 is not enough** - the generic fallback page loads fine too. Check that the page title is the city's own (not the generic "MLS® & Real Estate Map | REALTOR.ca") and that it shows real listing cards, not a "no results" panel.
+3. If it's the generic fallback, search realtor.ca's own search box for the city by hand and see what page it lands you on - the correct slug is the part of that URL between the province and `/real-estate`. Some places don't have their own page at all and only show up as part of a containing municipality or regional district (e.g. a hamlet under a rural county) - if so, that's the row's real target, not the hamlet name.
+4. Paste the working slug into the `seo_slug` column for that row in input.csv, then re-run with `--refresh-geo` for that city to force it to re-resolve.
 
-A few rows are already flagged `VERIFY` in the notes column - these are cities where a single municipality name may cover two distinct areas on realtor.ca (the City vs. District of North Vancouver, the City vs. Township of Langley) or where the town has recently changed names (Diamond Valley). Confirm these manually before relying on their results.
+As of this writing, these rows are known to hit the generic fallback and have never produced a listing - their `seo_slug` is intentionally left blank pending the manual check above: **Bragg Creek** and **Langdon** (Greater Calgary; both may fall under Rocky View County rather than having their own page), **North Vancouver City**, **North Vancouver District**, **Langley City**, **Langley Township** (Metro Vancouver; the City/District and City/Township pairs may not have separate realtor.ca pages), and **Bowser**, **Chemainus** (Vancouver Island).
 
 ## 11. Possible future additions (not built yet)
 

@@ -24,21 +24,20 @@ Run `python run_scraper.py --help` for the full list of options.
 See README.md for setup instructions.
 """
 import argparse
+import json
 import logging
-import random
 import sys
-import time
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
 from scraper.address import PROVINCE_ABBR_TO_NAME, parse_address
-from scraper.browser import launch_browser, wait_for_css
+from scraper.browser import launch_browser
 from scraper.config import load_config, load_excluded_keywords, load_input_rows
-from scraper.detail import enrich_listing_with_detail_page
 from scraper.filters import apply_keyword_filter
 from scraper.dateutils import estimate_listed_date
 from scraper.geocode import get_geo_params, load_geo_cache, save_geo_cache
+from scraper.http_fetch import DetailFetcher
 from scraper.models import SearchRow
 from scraper.search import fetch_all_pages
 from scraper.storage import (
@@ -122,7 +121,9 @@ def select_rows(rows, region_filter, city_filter):
     return selected
 
 
-def process_row(driver, row: SearchRow, geo_cache: dict, config: dict, args, run_timestamp: str, seen_mls: set):
+def process_row(
+    driver, fetcher: DetailFetcher, row: SearchRow, geo_cache: dict, config: dict, args, run_timestamp: str, seen_mls: set
+):
     scrape_cfg = config["scrape"]
 
     geo_params = get_geo_params(driver, geo_cache, row, force_refresh=args.refresh_geo)
@@ -144,25 +145,22 @@ def process_row(driver, row: SearchRow, geo_cache: dict, config: dict, args, run
     logger.info("%s, %s: %d new listing(s) not already in the master file.", row.city, row.region, len(new_listings))
 
     if args.dry_run:
+        for listing in new_listings:
+            print(json.dumps(listing.to_row(), ensure_ascii=False))
         return new_listings, []
 
     fetch_details = scrape_cfg.get("fetch_listing_details", True) and not args.no_details
     keywords = config["_keywords"]
-    delay_range = scrape_cfg.get("delay_between_listings_seconds", [2, 5])
+
+    # Pagination above leaves the browser holding a fresh, challenge-passed session;
+    # detail pages are fetched with a copy of it over plain HTTP (see http_fetch.py).
+    if fetch_details:
+        fetcher.enrich(new_listings, label=f"{row.city}, {row.region}")
 
     included, excluded = [], []
     for listing in new_listings:
         listing.first_seen_run = run_timestamp
         listing.date_scraped = datetime.now().isoformat(timespec="seconds")
-
-        if fetch_details and listing.listing_url:
-            try:
-                driver.get(listing.listing_url)
-                wait_for_css(driver, "#listingAddress", timeout_s=20)
-                time.sleep(random.uniform(*delay_range))
-                enrich_listing_with_detail_page(listing, driver.page_source)
-            except Exception as exc:
-                logger.warning("Could not load listing detail page %s: %s", listing.listing_url, exc)
 
         # Computed *after* the detail-page fetch above, since that's what fills in
         # listed_time_ago from realtor.ca's "Time on REALTOR.ca" field - a reliable
@@ -185,6 +183,7 @@ def process_row(driver, row: SearchRow, geo_cache: dict, config: dict, args, run
             listing.province = PROVINCE_ABBR_TO_NAME.get(row.province.strip().upper(), row.province)
 
         apply_keyword_filter(listing, keywords)
+        print(json.dumps(listing.to_row(), ensure_ascii=False))
         (excluded if listing.excluded else included).append(listing)
 
     return included, excluded
@@ -226,6 +225,7 @@ def main():
     excluded_log_path = output_dir / config["output"]["excluded_log_filename"]
 
     with launch_browser(config) as driver:
+        fetcher = DetailFetcher(driver, config)
         for region, region_rows in rows_by_region.items():
             logger.info("=== Region: %s (%d cities) ===", region, len(region_rows))
             m_path = master_path(output_dir, region, config["output"]["master_filename_template"], "csv")
@@ -234,7 +234,9 @@ def main():
             region_included, region_excluded = [], []
             for row in region_rows:
                 try:
-                    included, excluded = process_row(driver, row, geo_cache, config, args, run_timestamp, seen_mls)
+                    included, excluded = process_row(
+                        driver, fetcher, row, geo_cache, config, args, run_timestamp, seen_mls
+                    )
                 except Exception as exc:
                     logger.exception("Unexpected error processing %s, %s: %s", row.city, row.region, exc)
                     continue

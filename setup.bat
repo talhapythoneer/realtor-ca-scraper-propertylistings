@@ -63,7 +63,10 @@ echo.
 REM --- Step 3: install the required Python packages --------------
 echo Step 3 of 3: installing required packages (this can take a few minutes)...
 echo.
-python -m pip install --upgrade pip >nul
+REM Upgrading setuptools/wheel here avoids a "No module named distutils" error
+REM on newer Python versions (3.12+), which dropped distutils from the standard
+REM library - current setuptools ships its own replacement for it.
+python -m pip install --upgrade pip setuptools wheel >nul
 python -m pip install -r requirements.txt
 if errorlevel 1 (
     echo.

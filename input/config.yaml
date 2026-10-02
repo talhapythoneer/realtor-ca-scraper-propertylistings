@@ -55,7 +55,7 @@ output:
   output_dir: "output"
   master_filename_template: "{region}_master.{ext}"
   fresh_filename_template: "{region}_fresh_{timestamp}.{ext}"
-  excluded_log_filename: "excluded_listings_log.csv"
+  excluded_log_filename_template: "{region}_excluded_listings_log.csv"
   timestamp_format: "%Y-%m-%d_%H%M%S"
 
 geo:

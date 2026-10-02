@@ -6,9 +6,10 @@ One master + one fresh CSV/XLSX pair per region:
   - fresh:  only the new, non-excluded listings found during *this* run.
     This is what gets handed to the print shop for that week's mailer.
 
-Excluded listings (land/investor/teardown matches) are appended to a single
-cumulative log across all regions, so the client can review them and use the
-list later to fine-tune an AI-based filter, per the discussion with the client.
+Excluded listings (land/investor/teardown matches) are appended to a
+cumulative per-region log (one file per region, same as master/fresh), so
+the client can review them and use the list later to fine-tune an
+AI-based filter, per the discussion with the client.
 """
 import csv
 import logging
@@ -94,6 +95,11 @@ def fresh_path(output_dir: Path, region: str, template: str, ext: str, timestamp
     return output_dir / filename
 
 
+def excluded_log_path(output_dir: Path, region: str, template: str) -> Path:
+    filename = template.format(region=_safe_region_filename(region))
+    return output_dir / filename
+
+
 def _load_mls_numbers(csv_path: Path) -> set:
     if not csv_path.exists():
         return set()
@@ -114,14 +120,14 @@ def load_master_mls_numbers(csv_path: Path) -> set:
     return _load_mls_numbers(csv_path)
 
 
-def load_excluded_mls_numbers(excluded_log_path: Path) -> set:
-    """Return the set of mls_number values already logged as excluded.
+def load_excluded_mls_numbers(csv_path: Path) -> set:
+    """Return the set of mls_number values already logged as excluded for a region.
 
-    Checked alongside the master file so a listing that was excluded once
-    (land/investor/teardown keyword match) isn't re-fetched and re-checked
-    on every subsequent run - it's already been judged.
+    Checked alongside that region's master file so a listing that was
+    excluded once (land/investor/teardown keyword match) isn't re-fetched
+    and re-checked on every subsequent run - it's already been judged.
     """
-    return _load_mls_numbers(excluded_log_path)
+    return _load_mls_numbers(csv_path)
 
 
 def _write_csv(path: Path, rows: List[dict]) -> None:
@@ -223,7 +229,8 @@ def write_region_outputs(
 
 
 def append_excluded_log(path: Path, excluded_listings: List[Listing]) -> None:
-    """Append excluded listings to a cumulative CSV log, skipping MLS numbers already logged.
+    """Append excluded listings to a region's cumulative CSV log, skipping MLS
+    numbers already logged.
 
     Rewrites the whole file (existing rows + new ones) rather than a raw
     file-append, same as the master CSV - this keeps the header in sync with

@@ -10,7 +10,7 @@ writes per-region CSV + XLSX files to output/:
   - <Region>_master.csv/.xlsx     cumulative, deduplicated by MLS number
   - <Region>_fresh_<timestamp>.csv/.xlsx   just this run's new listings
 
-Excluded listings are logged to output/excluded_listings_log.csv so they can
+Excluded listings are logged to output/<Region>_excluded_listings_log.csv so they can
 be reviewed and later used to train an AI-based filter.
 
 Usage:
@@ -42,6 +42,7 @@ from scraper.models import SearchRow
 from scraper.search import fetch_all_pages
 from scraper.storage import (
     append_excluded_log,
+    excluded_log_path,
     load_excluded_mls_numbers,
     load_master_mls_numbers,
     master_path,
@@ -222,14 +223,14 @@ def main():
 
     grand_total_new = 0
     grand_total_excluded = 0
-    excluded_log_path = output_dir / config["output"]["excluded_log_filename"]
 
     with launch_browser(config) as driver:
         fetcher = DetailFetcher(driver, config)
         for region, region_rows in rows_by_region.items():
             logger.info("=== Region: %s (%d cities) ===", region, len(region_rows))
             m_path = master_path(output_dir, region, config["output"]["master_filename_template"], "csv")
-            seen_mls = load_master_mls_numbers(m_path) | load_excluded_mls_numbers(excluded_log_path)
+            excl_log_path = excluded_log_path(output_dir, region, config["output"]["excluded_log_filename_template"])
+            seen_mls = load_master_mls_numbers(m_path) | load_excluded_mls_numbers(excl_log_path)
 
             region_included, region_excluded = [], []
             for row in region_rows:
@@ -257,7 +258,7 @@ def main():
                 config["output"]["fresh_filename_template"],
                 run_timestamp,
             )
-            append_excluded_log(excluded_log_path, region_excluded)
+            append_excluded_log(excl_log_path, region_excluded)
 
             logger.info(
                 "%s: %d new listing(s) written, %d excluded by keyword filter.",

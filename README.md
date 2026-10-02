@@ -19,12 +19,17 @@ can open normally.
    [Google Chrome](https://www.google.com/chrome/) are installed. When
    installing Python, tick the box that says **"Add Python to PATH"** on the
    first screen - this matters.
-2. Double-click **`setup.bat`** in this folder. It installs everything the
-   scraper needs and tells you if anything's missing. You only do this once.
+2. Double-click **`setup.bat`** (Windows) or **`setup.command`** (Mac) in
+   this folder. It installs everything the scraper needs and tells you if
+   anything's missing. You only do this once.
+   - **On Mac**, the first time you open either `.command` file, macOS will
+     likely refuse and warn that it can't verify it's free of malware - this
+     is normal for any script that isn't a paid, Apple-notarized app, not a
+     real detection. See "Mac security warning" right below for the fix.
 
 **Every time you want new listings:**
 
-1. Double-click **`run_windows.bat`**.
+1. Double-click **`run_windows.bat`** (Windows) or **`run_mac.command`** (Mac).
 2. A Chrome window will pop up on its own and start browsing realtor.ca -
    this is normal, leave it alone and let it run in the background. Depending
    on how many cities are on the list, it can take anywhere from a few
@@ -42,21 +47,60 @@ can open normally.
   one run. **This is the file to look at each time** - it's short and it's
   exactly what's new since last time.
 
-That's the whole routine: run `run_windows.bat` whenever you want fresh
-listings (daily, weekly, whenever suits you), then open that run's newest
-`_fresh_...xlsx` file for each region.
+That's the whole routine: run `run_windows.bat`/`run_mac.command` whenever
+you want fresh listings (daily, weekly, whenever suits you), then open that
+run's newest `_fresh_...xlsx` file for each region.
 
 Want to add/remove a city or change a price range? See "Editing
 input/input.csv" below - it's a plain spreadsheet, no code involved. If
 something looks broken, jump to "Troubleshooting" further down, or send the
 `logs` folder to whoever set this up for you.
 
+### Mac security warning ("cannot be opened" / looks like a malware warning)
+
+The first time you try to open `setup.command` or `run_mac.command`, macOS
+will likely block it with a message like *"Apple could not verify 'setup.command'
+is free of malware."* This is standard macOS behaviour for **any** script that
+isn't a signed, paid Apple Developer app - it happens to every unsigned
+script ever shared this way, including this one. It is not a real detection.
+Try these in order:
+
+1. **Right-click** (or Control-click) the file → choose **Open** from the
+   menu (don't just double-click). A different dialog appears - if it has an
+   **Open** button, click it. You won't be asked again after this.
+2. **If that dialog only offers "Move to Trash"/"Cancel"** (no Open button -
+   this happens on newer macOS versions): open **System Settings → Privacy &
+   Security**, scroll down, and you'll see a line like *"'setup.command' was
+   blocked to protect your Mac."* Click **Open Anyway**, confirm with your
+   password/Touch ID, then try opening the file again.
+3. **Guaranteed fix if the above is finicky:** open **Terminal** (Spotlight
+   search → type "Terminal") and run, from inside this folder:
+   ```bash
+   xattr -d com.apple.quarantine setup.command run_mac.command
+   ```
+   This removes the flag macOS attaches to anything downloaded through a
+   browser. Afterwards, double-clicking works normally, with no more warnings.
+
+### Mac: "certificate verify failed" / SSL errors when running the scraper
+
+If Python was installed via the official installer from python.org (as
+opposed to Homebrew), it ships its own OpenSSL instead of using macOS's
+trust store, so any HTTPS request fails with `ssl.SSLCertVerificationError:
+... unable to get local issuer certificate` until a one-time fix is run.
+`setup.command` now runs this fix automatically - but if you set things up
+before that was added, or it still happens, fix it directly: open Finder →
+Applications → the "Python 3.x" folder (matching your installed version) →
+double-click **"Install Certificates.command"** inside it. Then try running
+the scraper again.
+
 ## 1. Folder structure
 
 ```
 realtor_ca/
-├── setup.bat                   <- double-click once, the first time only
-├── run_windows.bat             <- double-click every time you want to scrape
+├── setup.bat          <- Windows: double-click once, the first time only
+├── setup.command      <- Mac: double-click once, the first time only
+├── run_windows.bat    <- Windows: double-click every time you want to scrape
+├── run_mac.command    <- Mac: double-click every time you want to scrape
 ├── input/
 │   ├── input.csv               <- regions, cities, price filters (edit this to change what gets scraped)
 │   ├── excluded_keywords.csv   <- keywords that mark a listing as land/investor/teardown (edit this to tune filtering)
@@ -70,9 +114,10 @@ realtor_ca/
 
 ## 2. One-time setup
 
-**Easiest way:** double-click `setup.bat`. It checks that Python and Chrome
-are installed, tells you clearly if something's missing (with a link to get
-it), and installs the rest automatically. See the Quick Start above.
+**Easiest way:** double-click `setup.bat` (Windows) or `setup.command`
+(Mac). It checks that Python and Chrome are installed, tells you clearly if
+something's missing (with a link to get it), and installs the rest
+automatically. See the Quick Start above.
 
 **Manual way** (if you'd rather use a terminal): requires Python 3.10+ and
 Google Chrome installed (the scraper drives Chrome via `undetected_chromedriver`
@@ -82,18 +127,23 @@ Google Chrome installed (the scraper drives Chrome via `undetected_chromedriver`
 pip install -r requirements.txt
 ```
 
+(On Mac, use `pip3` instead of `pip` if plain `pip` isn't found.)
+
 That's it either way - `undetected_chromedriver` downloads and manages its
 own matching driver binary automatically the first time it runs.
 
 ## 3. Running it
 
-**Easiest way:** double-click `run_windows.bat`. See the Quick Start above.
+**Easiest way:** double-click `run_windows.bat` (Windows) or
+`run_mac.command` (Mac). See the Quick Start above.
 
 **Manual way:**
 
 ```bash
 python run_scraper.py
 ```
+
+(On Mac, use `python3` instead of `python` if plain `python` isn't found.)
 
 **Advanced options** (open a terminal for these - run `python run_scraper.py --help` for the full list):
 
@@ -136,7 +186,7 @@ Any listing whose description contains one of these keywords (case-insensitive) 
 - **active** - `Y`/`N` toggle.
 - **notes** - free text.
 
-This starts with a seed list covering the land/investor/teardown language discussed - add to it as you review results. This is the plain keyword-matching approach (no AI) - if you want to fine-tune an AI-based version of this later, `output/excluded_listings_log.csv` is exactly the training data you'll want (see below).
+This starts with a seed list covering the land/investor/teardown language discussed - add to it as you review results. This is the plain keyword-matching approach (no AI) - if you want to fine-tune an AI-based version of this later, each region's `output/<Region>_excluded_listings_log.csv` is exactly the training data you'll want (see below).
 
 ## 6. Output files
 
@@ -144,15 +194,12 @@ For each **region**, every run produces:
 
 - `<Region>_master.csv` / `.xlsx` - every listing ever captured for that region, across all runs, deduplicated by MLS number. This is the running record used to detect duplicates.
 - `<Region>_fresh_<timestamp>.csv` / `.xlsx` - only the new listings found in *this* run. This is what you'd send to the print shop for that week's mailer.
+- `<Region>_excluded_listings_log.csv` - listings from that region that matched an excluded keyword, with which keyword matched. Kept cumulatively per region (not overwritten), same as the master file, so each region's log can be reviewed on its own and, later, used to train an AI-based version of this filter.
 
 Each `.xlsx` file has two tabs (a plain `.csv` has no concept of tabs, so this split is Excel-only):
 
 - **Raw Data** - every field the scraper captures, same as the `.csv`.
 - **Print Shop** - just what the mailer needs: Unit, Street Address, City, Province, Postal Code, Price, Building Type, Date Listed.
-
-Across all regions:
-
-- `excluded_listings_log.csv` - listings that matched an excluded keyword, with which keyword matched. Kept cumulatively (not overwritten) so it can be reviewed and, later, used to train an AI-based version of this filter.
 
 Fields captured per listing: MLS number, price, address split into unit / street address / city / province / postal code (plus the original combined address for reference), property type, building type, bedrooms/bathrooms/square footage, description, estimated listed date, listing URL, agent name and phone, brokerage name/phone/fax/address. **Emails are not included** - realtor.ca doesn't expose agent/brokerage email addresses publicly.
 
@@ -213,5 +260,5 @@ As of this writing, these rows are known to hit the generic fallback and have ne
 
 These came up in discussion and are worth keeping in mind, but are out of scope for this delivery:
 
-- **AI-assisted filtering**: using the listing description and/or photos to catch teardown/vacant/investor listings that the keyword list misses. `config.yaml` has an `ai_filter` section already scaffolded (disabled) for this - `output/excluded_listings_log.csv` doubles as a starting training/review set for it.
+- **AI-assisted filtering**: using the listing description and/or photos to catch teardown/vacant/investor listings that the keyword list misses. `config.yaml` has an `ai_filter` section already scaffolded (disabled) for this - the per-region `output/<Region>_excluded_listings_log.csv` files double as a starting training/review set for it.
 - **Scheduling**: currently this is a manual, run-it-yourself script. It can be deployed to a small server later to run automatically (e.g. weekly) and push results somewhere like a Google Sheet or database instead of local files.

@@ -1,5 +1,7 @@
 # realtor.ca New Listings Scraper
 
+Built by [Talha Pythoneer](https://www.talhapythoneer.com), web scraping and AI agents.
+
 Scrapes newly-listed homes from realtor.ca for a set of target cities/regions
 and price ranges, drops listings that look like land-only/investor/teardown
 properties (via a keyword list), and writes the results to per-region CSV and

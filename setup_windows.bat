@@ -27,7 +27,7 @@ if errorlevel 1 (
     echo     2. Download and run the installer.
     echo     3. IMPORTANT: on the first install screen, tick the box
     echo        that says "Add Python to PATH" before clicking Install.
-    echo     4. Once it finishes, double-click this setup.bat file again.
+    echo     4. Once it finishes, double-click this setup_windows.bat file again.
     echo.
     pause
     exit /b 1
@@ -88,7 +88,7 @@ echo       cities you want (it already comes pre-filled).
 echo    2. Double-click run_windows.bat to run the scraper.
 echo    3. Your results will appear in the output folder.
 echo.
-echo  You only need to run this setup.bat file once. From now on,
+echo  You only need to run this setup_windows.bat file once. From now on,
 echo  just use run_windows.bat whenever you want new listings.
 echo ============================================================
 echo.

@@ -1,12 +1,12 @@
 #!/bin/bash
 # Double-click this file any time you want to scrape new listings.
-# First time using this scraper? Run setup.command once before this.
+# First time using this scraper? Run setup_mac.command once before this.
 # For advanced one-off options (e.g. --days-back, --dry-run), open
 # Terminal instead and run: python3 run_scraper.py --days-back 3
 #
 # If macOS blocks this with a "cannot verify / malware" warning the
 # first time, see the "Mac security warning" section in README.md -
-# the fix you did for setup.command covers this file too if you ran
+# the fix you did for setup_mac.command covers this file too if you ran
 # the xattr command on both at once.
 
 cd "$(dirname "$0")"
@@ -20,7 +20,7 @@ for candidate in python3 python; do
 done
 
 if [ -z "$PYTHON_CMD" ]; then
-    echo "Python was not found. Run setup.command first."
+    echo "Python was not found. Run setup_mac.command first."
     read -n 1 -s -r -p "Press any key to close this window..."
     echo ""
     exit 1

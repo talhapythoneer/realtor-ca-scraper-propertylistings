@@ -15,16 +15,16 @@ DEFAULT_CONFIG = {
     "scrape": {
         "headless": False,
         "page_load_timeout_ms": 45000,
+        "page_load_strategy": "eager",
         "nav_retry_count": 3,
-        "delay_between_pages_seconds": [3, 6],
+        "delay_between_api_calls_seconds": [1, 2],
         "delay_between_listings_seconds": [1, 1],
-        "max_pages_per_search": 40,
-        "max_listings_per_city": 600,
-        "consecutive_seen_to_stop": 20,
+        "api_records_per_page": 200,
         "default_days_back": 7,
         "sort": "6-D",
         "transaction_type_id": 2,
         "property_type_group_id": 1,
+        "property_search_type_id": 0,
         "currency": "CAD",
         "fetch_listing_details": True,
         "detail_fetch_method": "http",
@@ -61,6 +61,7 @@ DEFAULT_CONFIG = {
     "geo": {
         "cache_file": "data/geo_cache.json",
         "force_refresh": False,
+        "bbox_padding_km": 0,
     },
     "logging": {
         "log_dir": "logs",
@@ -126,6 +127,7 @@ def load_input_rows(path: Path) -> List[SearchRow]:
                         days_back=_to_int(raw.get("days_back")),
                         active=_to_bool(raw.get("active"), default=True),
                         notes=(raw.get("notes") or "").strip(),
+                        map_url=(raw.get("map_url") or "").strip(),
                     )
                 )
             except ValueError as exc:

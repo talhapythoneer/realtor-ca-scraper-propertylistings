@@ -12,6 +12,7 @@ OUTPUT_COLUMNS = [
     "price",
     "unit",
     "street_address",
+    "address_city",
     "full_address",
     "postal_code",
     "province",
@@ -48,6 +49,7 @@ class Listing:
     price: str = ""
     unit: str = ""
     street_address: str = ""
+    address_city: str = ""  # city as written in the postal address - what a mailer needs
     full_address: str = ""
     postal_code: str = ""
     province: str = ""
@@ -89,3 +91,6 @@ class SearchRow:
     days_back: Optional[int]
     active: bool
     notes: str = ""
+    # Optional realtor.ca map URL (copied from the browser address bar) whose visible
+    # map area defines the search area - for towns realtor.ca has no boundary for.
+    map_url: str = ""

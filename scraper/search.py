@@ -1,398 +1,368 @@
-"""Builds realtor.ca search filters, pages through results, and parses listing cards.
+"""Searches realtor.ca for a city's new listings through the site's own search API.
 
-Filtered/paginated search runs on the city's own SEO landing page (e.g.
-/ab/bragg-creek/real-estate) rather than the generic /map page - the /map page
-needs heavier map-specific JS bundles that proved unreliable in testing, and a
-real working example URL confirmed the SEO page path + a #view=list hash is
-what the site itself uses for this.
+realtor.ca's map page gets its results from a JSON API
+(api2.realtor.ca/Listing.svc/PropertySearch_Post) that takes the full set of
+filters - area, price range, "listed in the last N days", sort, page size.
+This scraper calls that same API from inside the browser page, so each
+request goes out with the browser's own cookies, headers and TLS fingerprint,
+exactly like the site's own requests.
 
-Navigation mirrors how a real user's browser actually applies a filter change
-on this page: land on it once, then update `location.hash` and dispatch a
-`hashchange` event in-page to apply the initial filters (price/date/sort),
-rather than doing a fresh full page load. Combined with driving the browser
-via undetected_chromedriver (non-headless - see browser.py), this is what got
-realtor.ca's live search actually returning results in testing, after
-Playwright (even via the real installed Chrome) consistently could not get
-past the site's protection at the point a search executes.
+Why not drive the site's UI instead (what the first version of this scraper
+did)? It set the filters in the URL hash of each city's SEO landing page
+(e.g. /bc/nanaimo/real-estate#PriceMin=...), but that page ignores the hash
+entirely - confirmed live: 752 unfiltered Nanaimo listings before and after.
+So no price or date filter was ever applied, and results were paged through
+11 at a time until a "seen it before" heuristic or a 40-page cap stopped it.
 
-Pagination beyond page 1, however, does NOT work by rewriting `CurrentPage`
-in the hash - confirmed directly in testing: every "page" requested that way
-returned identical results, silently. Clicking the site's own visible "next
-page" control does work (its hidden state carries forward GeoIds/GeoName
-context that our hash rewrite didn't reconstruct), so subsequent pages are
-advanced via a real click on that control instead.
+The API only answers once the browser holds a `cf_api_tok` cookie, which
+realtor.ca's map page sets when it loads. The token is short-lived (~30s,
+measured), and calls made without a valid one fail CORS with no response. So
+the session "primes" itself by (re)loading the map page whenever the token is
+missing or about to expire, and re-primes and retries if a call still fails.
 """
+import json
 import logging
 import random
-import re
 import time
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional, Tuple
-from urllib.parse import urlencode
 
-from bs4 import BeautifulSoup
-from selenium.webdriver.common.by import By
-
-from .browser import get_network_failures, is_blocked_page
-from .geocode import seo_landing_url, slugify_city
+from .address import parse_address
+from .browser import is_blocked_page, is_dead_browser_error
+from .geocode import BBOX_KEYS, describe_area
 from .models import Listing, SearchRow
+from .numeric import clean_price
 
 logger = logging.getLogger("realtor_scraper")
 
 BASE_URL = "https://www.realtor.ca"
-CARD_SELECTOR = "div.listingCard"
-RELATIVE_TIME_RE = re.compile(r"\b\d+\s*\+?\s*(minute|hour|day|week|month)s?\b", re.I)
+API_URL = "https://api2.realtor.ca/Listing.svc/PropertySearch_Post"
+# Any map page works for priming - it's the page's own scripts that fetch the token.
+PRIME_URL = f"{BASE_URL}/map#view=list&Sort=6-D&PropertyTypeGroupID=1&TransactionTypeId=2&PropertySearchTypeId=0&Currency=CAD"
+API_TOKEN_COOKIE = "cf_api_tok"
+TOKEN_SETTLE_S = 6   # see SearchSession.prime()
+TOKEN_MARGIN_S = 5   # re-prime when the token has less than this left
 
-# Sub-resources observed in testing to be blocked by realtor.ca's bot protection
-# specifically at search-execution time, distinct from the main page (which
-# loads fine). If either of these errors out, no amount of waiting/retrying
-# the same request will help.
-GUARDED_RESOURCE_PATTERNS = ("/bundles/js/desktop/", "/ping.html")
+# .NET DateTime ticks (100ns since 0001-01-01) - the format of InsertedDateUTC.
+_TICKS_AT_UNIX_EPOCH = 621355968000000000
 
-RESULTS_READY_JS = (
-    "return document.querySelector("
-    "'div.listingCard, #mapNoSidebarResultsCon, #mapSideBarNoResults') !== null;"
-)
-
-SET_HASH_JS = """
-window.location.hash = arguments[0];
-window.dispatchEvent(new HashChangeEvent('hashchange'));
+FETCH_JS = """
+const done = arguments[arguments.length - 1];
+fetch(arguments[0], {
+    method: 'POST',
+    credentials: 'include',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
+    body: new URLSearchParams(arguments[1]).toString(),
+}).then(r => r.text().then(t => done({status: r.status, text: t})))
+  .catch(e => done({status: -1, text: String(e)}));
 """
 
 
-def resolve_base_url(geo_params: dict, row: SearchRow) -> str:
-    return geo_params.get("_seo_url") or seo_landing_url(
-        row.province, row.seo_slug.strip() if row.seo_slug else slugify_city(row.city)
-    )
+class SearchBlockedError(RuntimeError):
+    """realtor.ca's search API kept refusing requests even after re-priming the session."""
 
 
-def build_search_params(geo_params: dict, row: SearchRow, scrape_cfg: dict, page_num: int) -> dict:
-    # geo_params comes from the site's own SEOLandingPageCriteria (GeoIds where
-    # available, PropertyTypeGroupID, PropertySearchTypeId, TransactionTypeId,
-    # Sort, RecordsPerPage, Currency) - these are realtor.ca's own confirmed-
-    # correct defaults for that city, so they take priority. Config only fills
-    # in anything the site didn't provide.
-    params = {k: v for k, v in geo_params.items() if not k.startswith("_")}
-    params["view"] = "list"
-    params.setdefault("Sort", scrape_cfg.get("sort", "6-D"))
-    params.setdefault("PropertyTypeGroupID", scrape_cfg.get("property_type_group_id", 1))
-    params.setdefault("TransactionTypeId", scrape_cfg.get("transaction_type_id", 2))
-    params.setdefault("PropertySearchTypeId", 0)
-    params.setdefault("Currency", scrape_cfg.get("currency", "CAD"))
-    params["CurrentPage"] = page_num
+class SearchSession:
+    """Calls realtor.ca's search API from inside the browser."""
 
-    days_back = row.days_back if row.days_back is not None else scrape_cfg.get("default_days_back", 7)
-    params["NumberOfDays"] = days_back
+    def __init__(self, browser, config: dict):
+        self.browser = browser  # BrowserSession - read .driver live, it changes on restart
+        self.scrape_cfg = config["scrape"]
+        self.retries = int(self.scrape_cfg.get("nav_retry_count", 3))
+        self.delay_range = self.scrape_cfg.get("delay_between_api_calls_seconds", [1, 2])
+        self._primed = False
 
-    if row.price_min:
-        params["PriceMin"] = row.price_min
-    if row.price_max:
-        params["PriceMax"] = row.price_max
+    @property
+    def driver(self):
+        return self.browser.driver
 
-    return params
+    def reset(self):
+        """Forget the primed state - call after the browser is restarted."""
+        self._primed = False
+
+    def _api_token(self) -> Optional[dict]:
+        try:
+            cookies = self.driver.execute_cdp_cmd("Network.getAllCookies", {})["cookies"]
+        except Exception as exc:
+            if is_dead_browser_error(exc):
+                raise
+            return None
+        return next((c for c in cookies if c.get("name") == API_TOKEN_COOKIE), None)
+
+    def _token_fresh(self, margin_s: float = TOKEN_MARGIN_S) -> bool:
+        token = self._api_token()
+        if not token:
+            return False
+        expires = token.get("expires") or -1
+        return expires <= 0 or expires > time.time() + margin_s  # <= 0: session cookie, no expiry
+
+    def prime(self, timeout_s: float = 30):
+        """(Re)load realtor.ca's map page and wait for a usable API token."""
+        logger.debug("Opening realtor.ca's map page for a fresh search token...")
+        try:
+            # Via a blank page: if the browser is already on PRIME_URL, get() of the
+            # same URL is a no-op, the page's scripts don't run again, and no fresh
+            # token is fetched - seen in testing as three failed retries in a row.
+            self.driver.get("about:blank")
+            self.driver.get(PRIME_URL)
+        except Exception as exc:
+            if is_dead_browser_error(exc):
+                raise
+            # A page-load timeout here is usually just slow ads/trackers; the page's
+            # own scripts may well have run anyway, which is all that matters.
+            logger.debug("Map page load did not complete cleanly: %s", exc)
+
+        if is_blocked_page(self.driver):
+            raise SearchBlockedError(
+                "realtor.ca's bot protection blocked the map page. Try again later, "
+                "or from a different network / with a proxy (see README)."
+            )
+
+        # Measured: the page sets a first token on load and replaces it 2-5s later;
+        # requests made with the first one can be refused. So wait for the
+        # replacement (or TOKEN_SETTLE_S, whichever comes first).
+        deadline = time.time() + timeout_s
+        first_value, first_seen = None, None
+        while time.time() < deadline:
+            token = self._api_token()
+            if token:
+                if first_value is None:
+                    first_value, first_seen = token.get("value"), time.time()
+                elif token.get("value") != first_value or time.time() - first_seen >= TOKEN_SETTLE_S:
+                    if self._token_fresh():
+                        self._primed = True
+                        return
+            time.sleep(0.5)
+        logger.warning("realtor.ca's map page didn't provide a search token within %.0fs.", timeout_s)
+        self._primed = True  # still worth trying - the request itself is the real test
+
+    def _post(self, body: dict) -> Tuple[int, str]:
+        self.driver.set_script_timeout(60)
+        result = self.driver.execute_async_script(FETCH_JS, API_URL, {k: str(v) for k, v in body.items()})
+        return result.get("status", -1), result.get("text", "")
+
+    def query(self, body: dict) -> dict:
+        """POST one search request; re-primes the session and retries on failure."""
+        last_problem = ""
+        for attempt in range(1, self.retries + 1):
+            if attempt > 1:
+                time.sleep(random.uniform(3, 6))
+                self.prime()
+            elif not self._primed or not self._token_fresh():
+                # The token only lasts ~30s (measured); a request sent with an expired
+                # one is refused. Cheaper to check than to fail and retry.
+                self.prime()
+            try:
+                status, text = self._post(body)
+            except Exception as exc:
+                if is_dead_browser_error(exc):
+                    raise
+                status, text = -1, str(exc)
+            if status == 200:
+                try:
+                    data = json.loads(text)
+                except ValueError:
+                    last_problem = f"unreadable response: {text[:120]!r}"
+                else:
+                    if data.get("ErrorCode", {}).get("Id", 200) == 200 or "Results" in data:
+                        return data
+                    last_problem = f"API error {data.get('ErrorCode')}"
+            else:
+                last_problem = f"HTTP {status}" if status != -1 else "request refused (no API token / blocked)"
+            logger.warning("Search request failed (attempt %d/%d): %s", attempt, self.retries, last_problem)
+        raise SearchBlockedError(f"realtor.ca's search kept failing after {self.retries} attempts: {last_problem}")
+
+    def pause(self):
+        time.sleep(random.uniform(*self.delay_range))
 
 
-def build_search_url(geo_params: dict, row: SearchRow, scrape_cfg: dict, page_num: int) -> str:
-    """Full standalone URL for a page - handy for logging/debugging; not used for navigation itself."""
-    base_url = resolve_base_url(geo_params, row)
-    params = build_search_params(geo_params, row, scrape_cfg, page_num)
-    return f"{base_url}#{urlencode(params)}"
+# -- result parsing ---------------------------------------------------------------------
 
 
-def _text(node) -> str:
-    if not node:
-        return ""
-    return node.get_text(strip=True).replace("\xa0", " ")
-
-
-def _extract_listing_id(href: str) -> str:
-    match = re.search(r"/real-estate/(\d+)/", href)
-    return match.group(1) if match else ""
-
-
-def parse_listing_cards(html: str, region: str, city: str) -> List[Listing]:
-    soup = BeautifulSoup(html, "html.parser")
-    listings: List[Listing] = []
-
-    for card in soup.select(CARD_SELECTOR):
-        link = card.select_one("a.listingDetailsLink")
-        if not link or not link.get("href"):
-            continue
-        href = link["href"]
-        listing_url = href if href.startswith("http") else f"{BASE_URL}{href}"
-
-        listing = Listing(
-            region=region,
-            city=city,
-            listing_id=_extract_listing_id(href),
-            listing_url=listing_url,
-            mls_number=_text(card.select_one(".listingCardMLS span")),
-            price=_text(card.select_one(".listingCardPrice")),
-            full_address=_text(card.select_one(".listingCardAddress")),
-            brokerage_name=_text(card.select_one(".listingCardOfficeName")),
+def _ticks_to_local_date(ticks: str, gmt_offset: str) -> str:
+    """InsertedDateUTC ("639269335056670000") -> listing-local YYYY-MM-DD.
+    gmt_offset is realtor.ca's ListingGMT, e.g. "-08:00:00"."""
+    try:
+        moment = datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(
+            microseconds=(int(ticks) - _TICKS_AT_UNIX_EPOCH) // 10
         )
+    except (TypeError, ValueError):
+        return ""
+    try:
+        sign = -1 if gmt_offset.strip().startswith("-") else 1
+        hours, minutes = gmt_offset.strip().lstrip("+-").split(":")[:2]
+        moment += sign * timedelta(hours=int(hours), minutes=int(minutes))
+    except (AttributeError, ValueError):
+        pass
+    return moment.date().isoformat()
 
-        img = card.select_one("img.listingCardImage")
-        if img and img.get("src"):
-            listing.image_url = img["src"]
 
-        for icon in card.select(".listingCardIconCon"):
-            label = _text(icon.select_one(".listingCardIconText")).lower()
-            value = _text(icon.select_one(".listingCardIconNum"))
-            if "bedroom" in label:
-                listing.bedrooms = value
-            elif "bathroom" in label:
-                listing.bathrooms = value
-            elif "square" in label:
-                listing.square_footage = value
+def _phone(phones: list, phone_type: str) -> str:
+    for phone in phones or []:
+        if (phone.get("PhoneType") or "").lower() == phone_type.lower():
+            area, number = phone.get("AreaCode", ""), phone.get("PhoneNumber", "")
+            return f"{area}-{number}" if area else number
+    return ""
 
-        tag_text = _text(card.select_one(".listingCardTagLabel"))
-        if tag_text and RELATIVE_TIME_RE.search(tag_text):
-            listing.listed_time_ago = tag_text
 
+def listing_from_result(result: dict, region: str, city: str) -> Listing:
+    prop = result.get("Property") or {}
+    building = result.get("Building") or {}
+    address = prop.get("Address") or {}
+    agents = result.get("Individual") or [{}]
+    agent = agents[0] or {}
+    office = agent.get("Organization") or {}
+    photos = prop.get("Photo") or [{}]
+
+    full_address = " ".join((address.get("AddressText") or "").replace("|", ", ").split())
+    parsed = parse_address(full_address)
+    listing = Listing(
+        region=region,
+        city=city,
+        mls_number=result.get("MlsNumber", ""),
+        listing_id=str(result.get("Id", "")),
+        price=prop.get("PriceUnformattedValue") or prop.get("Price", ""),
+        unit=parsed["unit"],
+        street_address=parsed["street_address"],
+        address_city=parsed["address_city"],
+        full_address=full_address,
+        postal_code=result.get("PostalCode") or parsed["postal_code"],
+        province=result.get("ProvinceName") or parsed["province"],
+        property_type=prop.get("Type", ""),
+        building_type=building.get("Type", ""),
+        bedrooms=building.get("Bedrooms", ""),
+        bathrooms=building.get("BathroomTotal", ""),
+        square_footage=building.get("SizeInterior", ""),
+        storeys=building.get("StoriesTotal", ""),
+        listed_time_ago=result.get("TimeOnRealtor", ""),
+        estimated_listed_date=_ticks_to_local_date(result.get("InsertedDateUTC"), result.get("ListingGMT", "")),
+        listing_url=f"{BASE_URL}{result.get('RelativeDetailsURL', '')}" if result.get("RelativeDetailsURL") else "",
+        image_url=photos[0].get("MedResPath", "") if photos and photos[0] else "",
+        agent_name=agent.get("Name", ""),
+        agent_phone=_phone(agent.get("Phones"), "Telephone"),
+        brokerage_name=office.get("Name", ""),
+        brokerage_phone=_phone(office.get("Phones"), "Telephone"),
+        brokerage_fax=_phone(office.get("Phones"), "Fax"),
+        brokerage_address=" ".join(((office.get("Address") or {}).get("AddressText") or "").replace("|", ", ").split()),
+        description=result.get("PublicRemarks", ""),
+    )
+    return listing
+
+
+# -- searching --------------------------------------------------------------------------
+
+
+def days_back_for(row: SearchRow, scrape_cfg: dict) -> int:
+    return row.days_back if row.days_back is not None else int(scrape_cfg.get("default_days_back", 7))
+
+
+def build_search_body(geo_params: dict, row: SearchRow, scrape_cfg: dict,
+                      price_min: Optional[int], price_max: Optional[int], page: int) -> dict:
+    body = {
+        "Sort": scrape_cfg.get("sort", "6-D"),
+        "PropertyTypeGroupID": scrape_cfg.get("property_type_group_id", 1),
+        "TransactionTypeId": scrape_cfg.get("transaction_type_id", 2),
+        "PropertySearchTypeId": scrape_cfg.get("property_search_type_id", 0),
+        "Currency": scrape_cfg.get("currency", "CAD"),
+        "IncludeHiddenListings": "false",
+        "NumberOfDays": days_back_for(row, scrape_cfg),
+        "RecordsPerPage": scrape_cfg.get("api_records_per_page", 200),
+        "CurrentPage": page,
+        "ApplicationId": 1,
+        "CultureId": 1,
+        "Version": "7.0",
+    }
+    if geo_params.get("GeoIds"):
+        body["GeoIds"] = geo_params["GeoIds"]
+    else:
+        body.update({k: geo_params[k] for k in BBOX_KEYS})
+        body["ZoomLevel"] = 13
+    if price_min:
+        body["PriceMin"] = price_min
+    if price_max:
+        body["PriceMax"] = price_max
+    return body
+
+
+def _search_price_band(session: SearchSession, geo_params: dict, row: SearchRow, scrape_cfg: dict,
+                       price_min: Optional[int], price_max: Optional[int], depth: int = 0) -> List[dict]:
+    """All results for one price band, paging through the API. realtor.ca stops
+    returning results past MaxRecords (600) for a single search, so a band with
+    more than that is split in two and each half searched separately."""
+    first = session.query(build_search_body(geo_params, row, scrape_cfg, price_min, price_max, 1))
+    paging = first.get("Paging") or {}
+    total = int(paging.get("TotalRecords") or 0)
+    max_records = int(paging.get("MaxRecords") or 600)
+
+    if total > max_records and depth < 8:
+        low = price_min or 0
+        high = price_max or max(low * 2, low + 1_000_000)
+        mid = (low + high) // 2
+        logger.info(
+            "%s: %d listings in $%s-%s is over realtor.ca's %d-per-search limit - splitting the price range.",
+            row.city, total, f"{low:,}", f"{price_max:,}" if price_max else "max", max_records,
+        )
+        session.pause()
+        lower = _search_price_band(session, geo_params, row, scrape_cfg, price_min, mid, depth + 1)
+        session.pause()
+        upper = _search_price_band(session, geo_params, row, scrape_cfg, mid + 1, price_max, depth + 1)
+        return lower + upper
+    if total > max_records:
+        logger.warning("%s: still %d listings after splitting the price range - only the first %d are read.",
+                       row.city, total, max_records)
+
+    results = list(first.get("Results") or [])
+    total_pages = int(paging.get("TotalPages") or 1)
+    for page in range(2, total_pages + 1):
+        session.pause()
+        data = session.query(build_search_body(geo_params, row, scrape_cfg, price_min, price_max, page))
+        results.extend(data.get("Results") or [])
+    return results
+
+
+def _outside_filters(listing: Listing, row: SearchRow, cutoff: date) -> str:
+    """Why a listing doesn't match the row's filters (or "" if it does). A safety net
+    so a filter that realtor.ca stops honouring can never silently leak into the output."""
+    price = clean_price(listing.price)
+    if price is not None:
+        if row.price_min and price < row.price_min:
+            return "below price_min"
+        if row.price_max and price > row.price_max:
+            return "above price_max"
+    if listing.estimated_listed_date and listing.estimated_listed_date < cutoff.isoformat():
+        return "older than days_back"
+    return ""
+
+
+def search_city(session: SearchSession, geo_params: dict, row: SearchRow, scrape_cfg: dict) -> List[Listing]:
+    """Every listing in a row's area, price range and listed-since window."""
+    days_back = days_back_for(row, scrape_cfg)
+    logger.info(
+        "%s: searching %s, $%s-%s, listed in the last %d day(s).",
+        row.city, describe_area(geo_params), f"{row.price_min:,}" if row.price_min else "0",
+        f"{row.price_max:,}" if row.price_max else "max", days_back,
+    )
+    raw_results = _search_price_band(session, geo_params, row, scrape_cfg, row.price_min, row.price_max)
+
+    # One day of slack: realtor.ca counts the window in its own timezone, and
+    # InsertedDateUTC -> local date can land a listing just across midnight.
+    cutoff = (datetime.now() - timedelta(days=days_back + 1)).date()
+    listings, seen, dropped = [], set(), {}
+    for result in raw_results:
+        listing = listing_from_result(result, row.region, row.city)
+        key = listing.mls_number or listing.listing_id
+        if key in seen:
+            continue
+        seen.add(key)
+        reason = _outside_filters(listing, row, cutoff)
+        if reason:
+            dropped[reason] = dropped.get(reason, 0) + 1
+            continue
         listings.append(listing)
 
-    return listings
-
-
-def _wait_for_results_or_failure(driver, timeout_s: int = 25, poll_s: float = 0.5):
-    """Poll until listing cards (or a "no results" marker) appear, or a guarded
-    resource fails to load. Returns ("ready", None), ("blocked", (status, url)),
-    or ("timeout", None)."""
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        failures = get_network_failures(driver, GUARDED_RESOURCE_PATTERNS)
-        if failures:
-            return "blocked", failures[0]
-        try:
-            if driver.execute_script(RESULTS_READY_JS):
-                return "ready", None
-        except Exception:
-            pass  # page mid-navigation; try again next poll
-        time.sleep(poll_s)
-    return "timeout", None
-
-
-def _wait_for_page_change(driver, region: str, city: str, previous_signature: Tuple[str, ...], timeout_s: int = 25, poll_s: float = 0.5):
-    """After clicking 'next page', poll until the rendered listings actually
-    differ from `previous_signature` (not just "some card is present" - right
-    after a click, the *previous* page's cards are still in the DOM until the
-    AJAX response replaces them, so a naive presence check would return
-    immediately without waiting for the real update)."""
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        failures = get_network_failures(driver, GUARDED_RESOURCE_PATTERNS)
-        if failures:
-            return "blocked", failures[0]
-        try:
-            html = driver.page_source
-        except Exception:
-            html = ""
-        listings = parse_listing_cards(html, region, city)
-        if listings and _page_signature(listings) != previous_signature:
-            return "ready", None
-        if not listings and ("mapNoSidebarResultsCon" in html or "mapSideBarNoResults" in html):
-            return "ready", None  # legitimately reached the end of results
-        time.sleep(poll_s)
-    return "timeout", None
-
-
-def _land_on_search_page(driver, base_url: str, city: str, nav_retry_count: int) -> bool:
-    """Do the one full page load per city, onto its plain SEO landing page (no hash).
-
-    This has proven reliable throughout testing - it's the live filtered
-    search that's fragile, not this page itself - so this uses a lighter
-    retry than the per-page filter application below. Also gives the page's
-    own JS a moment to finish initializing before we start changing its hash.
-    """
-    for attempt in range(1, nav_retry_count + 1):
-        if attempt > 1:
-            time.sleep(random.uniform(3, 6))
-        try:
-            driver.get(base_url)
-        except Exception as exc:
-            logger.warning(
-                "Navigation error loading %s for %s (attempt %d/%d): %s", base_url, city, attempt, nav_retry_count, exc
-            )
-            continue
-
-        if is_blocked_page(driver):
-            logger.error("%s was blocked by realtor.ca's bot protection for %s.", base_url, city)
-            return False
-
-        time.sleep(2)  # let the page's own JS finish registering its hash-change listener
-        return True
-
-    return False
-
-
-def _apply_search_filters(driver, params: dict, city: str, page_num: int, nav_retry_count: int) -> bool:
-    """Apply a page's worth of search filters via an in-page hash change (no full reload).
-
-    Returns True once the page has settled (listings or a "no results" marker
-    present), False if it never did after all retries.
-    """
-    fragment = urlencode(params)
-
-    for attempt in range(1, nav_retry_count + 1):
-        if attempt > 1:
-            time.sleep(random.uniform(3, 6))  # back off before retrying, don't hammer a slow/struggling server
-
-        get_network_failures(driver, GUARDED_RESOURCE_PATTERNS)  # drain stale entries before this attempt
-
-        try:
-            driver.execute_script(SET_HASH_JS, fragment)
-        except Exception as exc:
-            logger.warning(
-                "Error applying search filters on page %d for %s (attempt %d/%d): %s",
-                page_num, city, attempt, nav_retry_count, exc,
-            )
-            continue
-
-        outcome, detail = _wait_for_results_or_failure(driver)
-        if outcome == "ready":
-            return True
-        if outcome == "blocked":
-            status, failed_url = detail
-            logger.error(
-                "Page %d for %s never loaded results because a required script/check failed "
-                "(HTTP %d on %s). This looks like realtor.ca blocking the search itself, not a "
-                "network glitch - not retrying. Consider enabling a proxy in config.yaml, or trying "
-                "again later from a less-flagged network.",
-                page_num, city, status, failed_url,
-            )
-            return False
+    if dropped:
         logger.warning(
-            "Timed out waiting for results on page %d for %s (attempt %d/%d).",
-            page_num, city, attempt, nav_retry_count,
+            "%s: realtor.ca returned %d listing(s) outside this row's filters (%s) - dropped them.",
+            row.city, sum(dropped.values()), ", ".join(f"{n} {why}" for why, n in dropped.items()),
         )
-
-    return False
-
-
-def _click_next_page(driver) -> bool:
-    """Click the visible 'next page' pagination control.
-
-    There are normally several matching elements in the DOM (map sidebar,
-    popup infobox, etc.) but only one is visible at a time - clicking a
-    hidden one is a no-op. Returns False if none are visible (no next page /
-    end of results).
-    """
-    try:
-        candidates = driver.find_elements(By.CSS_SELECTOR, "a.lnkNextResultsPage")
-    except Exception:
-        return False
-
-    for candidate in candidates:
-        try:
-            if candidate.is_displayed():
-                driver.execute_script("arguments[0].click();", candidate)
-                return True
-        except Exception:
-            continue
-    return False
-
-
-def _page_signature(listings: List[Listing]) -> Tuple[str, ...]:
-    return tuple(listing.mls_number or listing.listing_id for listing in listings)
-
-
-def fetch_all_pages(driver, geo_params: dict, row: SearchRow, scrape_cfg: dict, seen_mls: Optional[set] = None) -> List[Listing]:
-    """Page through a city's search results (newest-listed first).
-
-    Stops when any of:
-      - a page comes back with no listings at all (end of results),
-      - the "next page" control isn't there/visible any more (end of results),
-      - a page's listings are identical to the previous page's - pagination
-        has silently stalled and clicking isn't advancing it any further, or
-      - `consecutive_seen_to_stop` listings in a row have already been scraped
-        before (present in `seen_mls`). Because results are sorted newest
-        first, a long unbroken run of already-seen listings means everything
-        after it is old too, so there's no need to keep paging through the
-        rest of this city's results.
-    A single already-seen listing doesn't trigger the last case - re-listed/
-    bumped listings can appear out of strict date order, so we wait for a
-    real run of them before concluding we've caught up.
-    """
-    all_listings: List[Listing] = []
-    seen_mls = seen_mls or set()
-    max_pages = scrape_cfg.get("max_pages_per_search", 40)
-    max_listings = scrape_cfg.get("max_listings_per_city", 600)
-    delay_range = scrape_cfg.get("delay_between_pages_seconds", [3, 6])
-    consecutive_seen_to_stop = scrape_cfg.get("consecutive_seen_to_stop", 20)
-    nav_retry_count = scrape_cfg.get("nav_retry_count", 3)
-    consecutive_seen = 0
-    previous_signature: Optional[Tuple[str, ...]] = None
-
-    base_url = resolve_base_url(geo_params, row)
-    if not _land_on_search_page(driver, base_url, row.city, nav_retry_count):
-        return all_listings
-
-    # Page 1 sets the actual filters (price/date/sort/etc.) via a hash change.
-    page1_params = build_search_params(geo_params, row, scrape_cfg, page_num=1)
-    if not _apply_search_filters(driver, page1_params, row.city, 1, nav_retry_count):
-        return all_listings
-
-    for page_num in range(1, max_pages + 1):
-        # Let async card rendering / lazy content settle.
-        time.sleep(1.5)
-        html = driver.page_source
-        page_listings = parse_listing_cards(html, row.region, row.city)
-
-        if not page_listings:
-            logger.info("Page %d for %s returned no listings - stopping pagination.", page_num, row.city)
-            break
-
-        signature = _page_signature(page_listings)
-        if signature == previous_signature:
-            logger.info(
-                "Page %d for %s repeated the previous page's listings - pagination has stalled, stopping.",
-                page_num, row.city,
-            )
-            break
-        previous_signature = signature
-
-        all_listings.extend(page_listings)
-        logger.info("Page %d for %s: %d listings (running total %d).", page_num, row.city, len(page_listings), len(all_listings))
-
-        for listing in page_listings:
-            key = listing.mls_number or f"id:{listing.listing_id}"
-            if key in seen_mls:
-                consecutive_seen += 1
-                if consecutive_seen >= consecutive_seen_to_stop:
-                    logger.info(
-                        "%d already-scraped listings in a row for %s - assuming the rest are old too, "
-                        "moving to the next city.",
-                        consecutive_seen,
-                        row.city,
-                    )
-                    return all_listings
-            else:
-                consecutive_seen = 0
-
-        if len(all_listings) >= max_listings:
-            logger.warning("Hit max_listings_per_city (%d) for %s - stopping early.", max_listings, row.city)
-            break
-
-        if page_num >= max_pages:
-            break
-
-        time.sleep(random.uniform(*delay_range))
-
-        if not _click_next_page(driver):
-            logger.info("No next-page control for %s - assuming end of results.", row.city)
-            break
-
-        outcome, detail = _wait_for_page_change(driver, row.region, row.city, previous_signature)
-        if outcome == "blocked":
-            status, failed_url = detail
-            logger.error(
-                "Page %d for %s never loaded after clicking next (HTTP %d on %s) - looks like "
-                "realtor.ca blocking the search itself. Consider enabling a proxy in config.yaml.",
-                page_num + 1, row.city, status, failed_url,
-            )
-            break
-        if outcome == "timeout":
-            logger.warning("Timed out waiting for page %d for %s after clicking next.", page_num + 1, row.city)
-            break
-
-    return all_listings
+    return listings

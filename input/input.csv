@@ -1,44 +1,45 @@
 region,city,seo_slug,province,price_min,price_max,days_back,active
-Greater Calgary,Calgary,calgary,AB,800000,,,Y
-Greater Calgary,Okotoks,okotoks,AB,700000,,,Y
-Greater Calgary,Cochrane,cochrane,AB,700000,,,Y
-Greater Calgary,Airdrie,airdrie,AB,700000,,,Y
-Greater Calgary,Chestermere,chestermere,AB,700000,,,Y
-Greater Calgary,High River,high-river,AB,700000,,,Y
-Greater Calgary,Diamond Valley,diamond-valley,AB,700000,,,Y
-Greater Calgary,Bragg Creek,,AB,700000,,,Y
-Greater Calgary,Strathmore,strathmore,AB,700000,,,Y
-Greater Calgary,Crossfield,crossfield,AB,700000,,,Y
-Greater Calgary,Langdon,,AB,700000,,,Y
-Metro Vancouver,Vancouver,vancouver,BC,1500000,,,Y
-Metro Vancouver,Burnaby,burnaby,BC,1500000,,,Y
-Metro Vancouver,Richmond,richmond,BC,1500000,,,Y
-Metro Vancouver,North Vancouver City,city-of-north-vancouver,BC,1500000,,,Y
-Metro Vancouver,North Vancouver District,district-of-north-vancouver,BC,1500000,,,Y
-Metro Vancouver,West Vancouver,west-vancouver,BC,1500000,,,Y
-Metro Vancouver,Delta,delta,BC,1500000,,,Y
-Metro Vancouver,White Rock,white-rock,BC,1500000,,,Y
-Metro Vancouver,Surrey,surrey,BC,1500000,,,Y
-Metro Vancouver,Coquitlam,coquitlam,BC,1500000,,,Y
-Metro Vancouver,Anmore,anmore,BC,1500000,,,Y
-Metro Vancouver,Belcarra,belcarra,BC,1500000,,,Y
-Metro Vancouver,Port Moody,port-moody,BC,1500000,,,Y
-Metro Vancouver,New Westminster,new-westminster,BC,1500000,,,Y
-Metro Vancouver,Langley City,city-of-langley,BC,1500000,,,Y
-Metro Vancouver,Langley Township,township-of-langley,BC,1500000,,,Y
-Metro Vancouver,Pitt Meadows,pitt-meadows,BC,1500000,,,Y
-Metro Vancouver,Maple Ridge,maple-ridge,BC,1500000,,,Y
-Metro Vancouver,Port Coquitlam,port-coquitlam,BC,1500000,,,Y
-Metro Vancouver,Lions Bay,lions-bay,BC,1500000,,,Y
-Metro Vancouver,Bowen Island,bowen-island,BC,1500000,,,Y
-Vancouver Island,Bowser,,BC,700000,,,Y
-Vancouver Island,Chemainus,,BC,700000,,,Y
-Vancouver Island,Courtenay,courtenay,BC,700000,,,Y
-Vancouver Island,Duncan,duncan,BC,700000,,,Y
-Vancouver Island,Gabriola,gabriola-island,BC,700000,,,Y
-Vancouver Island,Ladysmith,ladysmith,BC,700000,,,Y
-Vancouver Island,Lantzville,lantzville,BC,700000,,,Y
-Vancouver Island,Nanaimo,nanaimo,BC,700000,,,Y
-Vancouver Island,Nanoose Bay,nanoose-bay,BC,700000,,,Y
-Vancouver Island,Parksville,parksville,BC,700000,,,Y
-Vancouver Island,Qualicum Beach,qualicum-beach,BC,700000,,,Y
+Greater Calgary,Calgary,calgary,AB,650000,2500000,,Y
+Greater Calgary,Okotoks,okotoks,AB,650000,1400000,,Y
+Greater Calgary,Cochrane,cochrane,AB,650000,1400000,,Y
+Greater Calgary,Airdrie,airdrie,AB,575000,1200000,,Y
+Greater Calgary,Chestermere,chestermere,AB,650000,1500000,,Y
+Greater Calgary,High River,high-river,AB,575000,1000000,,Y
+Greater Calgary,Diamond Valley,diamond-valley,AB,575000,1000000,,Y
+Greater Calgary,Bragg Creek,,AB,1000000,2000000,,Y
+Greater Calgary,Strathmore,strathmore,AB,550000,900000,,Y
+Greater Calgary,Crossfield,crossfield,AB,575000,950000,,Y
+Greater Calgary,Langdon,,AB,650000,1300000,,Y
+Metro Vancouver,Vancouver,vancouver,BC,1200000,3500000,,Y
+Metro Vancouver,Burnaby,burnaby,BC,900000,2500000,,Y
+Metro Vancouver,Richmond,richmond,BC,900000,2600000,,Y
+Metro Vancouver,North Vancouver City,city-of-north-vancouver,BC,1100000,3000000,,Y
+Metro Vancouver,North Vancouver District,district-of-north-vancouver,BC,1200000,3000000,,Y
+Metro Vancouver,West Vancouver,west-vancouver,BC,2000000,4000000,,Y
+Metro Vancouver,Delta,delta,BC,750000,1900000,,Y
+Metro Vancouver,White Rock,white-rock,BC,750000,2300000,,Y
+Metro Vancouver,Surrey,surrey,BC,800000,2000000,,Y
+Metro Vancouver,Coquitlam,coquitlam,BC,900000,2500000,,Y
+Metro Vancouver,Anmore,anmore,BC,1800000,3500000,,Y
+Metro Vancouver,Belcarra,belcarra,BC,1800000,3500000,,Y
+Metro Vancouver,Port Moody,port-moody,BC,900000,3000000,,Y
+Metro Vancouver,New Westminster,new-westminster,BC,800000,2000000,,Y
+Metro Vancouver,Langley City,city-of-langley,BC,700000,2500000,,Y
+Metro Vancouver,Langley Township,township-of-langley,BC,800000,3000000,,Y
+Metro Vancouver,Pitt Meadows,pitt-meadows,BC,700000,2000000,,Y
+Metro Vancouver,Maple Ridge,maple-ridge,BC,700000,1800000,,Y
+Metro Vancouver,Port Coquitlam,port-coquitlam,BC,800000,1700000,,Y
+Metro Vancouver,Lions Bay,lions-bay,BC,1500000,3000000,,Y
+Metro Vancouver,Bowen Island,bowen-island,BC,1000000,2500000,,Y
+Vancouver Island,Bowser,,BC,750000,1600000,,Y
+Vancouver Island,Chemainus,,BC,600000,1600000,,Y
+Vancouver Island,Courtenay,courtenay,BC,700000,1600000,,Y
+Vancouver Island,Duncan,duncan,BC,650000,1600000,,Y
+Vancouver Island,Gabriola,gabriola-island,BC,650000,1600000,,Y
+Vancouver Island,Ladysmith,ladysmith,BC,650000,1600000,,Y
+Vancouver Island,Lantzville,lantzville,BC,850000,1800000,,Y
+Vancouver Island,Nanaimo,nanaimo,BC,650000,1600000,,Y
+Vancouver Island,Nanoose Bay,nanoose-bay,BC,700000,1800000,,Y
+Vancouver Island,Parksville,parksville,BC,650000,1600000,,Y
+Vancouver Island,Qualicum Beach,qualicum-beach,BC,650000,1600000,,Y
+Vancouver Island,Port Alberni,port-alberni,BC,550000,1000000,,Y

@@ -1,6 +1,6 @@
 @echo off
 REM Double-click this file any time you want to scrape new listings.
-REM First time using this scraper? Run setup.bat once before this.
+REM First time using this scraper? Run setup_windows.bat once before this.
 REM For advanced one-off options (e.g. --days-back, --dry-run), open a
 REM terminal instead and run: python run_scraper.py --days-back 3
 cd /d "%~dp0"

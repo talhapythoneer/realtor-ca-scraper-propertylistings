@@ -36,6 +36,7 @@ def enrich_listing_with_detail_page(listing: Listing, html: str) -> Listing:
         parsed = parse_address(full_address)
         listing.unit = parsed["unit"]
         listing.street_address = parsed["street_address"]
+        listing.address_city = parsed["address_city"] or listing.address_city
         listing.province = parsed["province"]
         listing.postal_code = parsed["postal_code"]
 

@@ -40,7 +40,7 @@ from urllib.parse import quote, urlparse
 
 from curl_cffi import requests as curl_requests
 
-from .browser import wait_for_css
+from .browser import is_dead_browser_error, wait_for_css
 from .detail import enrich_listing_with_detail_page
 from .models import Listing
 
@@ -86,9 +86,9 @@ def _build_proxy_url(proxy_cfg: dict) -> Optional[str]:
 
 
 class DetailFetcher:
-    def __init__(self, driver, config: dict):
+    def __init__(self, browser, config: dict):
         scrape_cfg = config["scrape"]
-        self.driver = driver
+        self.browser = browser  # BrowserSession - read .driver live, it changes on restart
         self.method = scrape_cfg.get("detail_fetch_method", "http")
         self.concurrency = max(1, int(scrape_cfg.get("http_concurrency", 2)))
         self.request_interval_s = 60.0 / float(scrape_cfg.get("http_max_requests_per_minute", 50))
@@ -117,6 +117,10 @@ class DetailFetcher:
         self._progress_total = 0
         self._progress_label = ""
         self._progress_started = 0.0
+
+    @property
+    def driver(self):
+        return self.browser.driver
 
     def _new_session(self) -> curl_requests.Session:
         session = curl_requests.Session(
@@ -275,6 +279,8 @@ class DetailFetcher:
             time.sleep(random.uniform(*self.browser_delay_range))
             enrich_listing_with_detail_page(listing, self.driver.page_source)
         except Exception as exc:
+            if is_dead_browser_error(exc):
+                raise
             logger.warning("Could not load listing detail page %s: %s", listing.listing_url, exc)
         self._note_progress("browser", listing)
 

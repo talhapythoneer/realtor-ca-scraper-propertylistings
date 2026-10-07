@@ -13,6 +13,7 @@ AI-based filter, per the discussion with the client.
 """
 import csv
 import logging
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
@@ -27,7 +28,7 @@ logger = logging.getLogger("realtor_scraper")
 
 # Fields recomputed from full_address on every write, so historical rows scraped
 # before this parsing existed get backfilled automatically instead of staying blank.
-_ADDRESS_DERIVED_FIELDS = ("unit", "street_address", "province", "postal_code")
+_ADDRESS_DERIVED_FIELDS = ("unit", "street_address", "address_city", "province", "postal_code")
 
 # Numeric display fields ("$698,000", "3 + 2", "1200+") converted to real numbers so
 # Excel/CSV consumers can sort and filter them, instead of treating them as text.
@@ -44,7 +45,7 @@ _NUMERIC_FIELD_CLEANERS = {
 PRINT_SHOP_COLUMNS = [
     "unit",
     "street_address",
-    "city",
+    "address_city",  # the postal city ("North Vancouver"), not the search area ("North Vancouver District")
     "province",
     "postal_code",
     "price",
@@ -75,6 +76,8 @@ def normalize_row(row: dict) -> dict:
     parsed = parse_address(row.get("full_address", ""))
     for field in _ADDRESS_DERIVED_FIELDS:
         row[field] = parsed[field]
+    if not row["address_city"]:
+        row["address_city"] = row.get("city", "")
     for field, cleaner in _NUMERIC_FIELD_CLEANERS.items():
         value = cleaner(row.get(field, ""))
         row[field] = value if value is not None else ""
@@ -253,3 +256,25 @@ def append_excluded_log(path: Path, excluded_listings: List[Listing]) -> None:
         return
 
     _write_csv(path, existing_rows + new_rows)
+
+
+def archive_region_outputs(output_dir: Path, region: str, templates: dict, stamp: str) -> List[Path]:
+    """Move a region's master, excluded-log and fresh files into output/archive_<stamp>/,
+    so the next run starts from an empty master (every listing in the window counts
+    as new again). Nothing is deleted - the archive folder keeps the old files."""
+    safe = _safe_region_filename(region)
+    candidates = [
+        master_path(output_dir, region, templates["master_filename_template"], ext) for ext in ("csv", "xlsx")
+    ]
+    candidates.append(excluded_log_path(output_dir, region, templates["excluded_log_filename_template"]))
+    fresh_glob = templates["fresh_filename_template"].format(region=safe, ext="*", timestamp="*")
+    candidates.extend(output_dir.glob(fresh_glob))
+
+    moved = []
+    archive_dir = output_dir / f"archive_{stamp}"
+    for path in candidates:
+        if path.is_file():
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(path), str(archive_dir / path.name))
+            moved.append(archive_dir / path.name)
+    return moved

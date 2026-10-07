@@ -5,17 +5,16 @@ scrape:
   headless: false              # MUST stay false - confirmed in testing that realtor.ca's bot protection
                                # blocks even the first page load in headless mode under this browser.
   page_load_timeout_ms: 45000
-  nav_retry_count: 3           # retries for a page/navigation before giving up on that page
-  delay_between_pages_seconds: [3, 6]     # random delay range between result-list pages
-  delay_between_listings_seconds: [1, 1]  # pause after loading a listing page in the browser
-  max_pages_per_search: 40     # safety cap per city, per run
-  max_listings_per_city: 600   # safety cap per city, per run
-  consecutive_seen_to_stop: 20 # results are newest-first; after this many already-scraped
-                                # listings in a row, assume the rest are old too and move on
+  page_load_strategy: "eager"  # don't wait for realtor.ca's ads/trackers to finish loading (they caused timeouts)
+  nav_retry_count: 3           # attempts per search request before giving up (the session is refreshed between tries)
+  delay_between_api_calls_seconds: [1, 2]  # random pause between search requests
+  delay_between_listings_seconds: [1, 1]   # pause after loading a listing page in the browser
+  api_records_per_page: 200    # listings per search request (realtor.ca allows up to 200)
   default_days_back: 7         # "listed since" window in days, used when a row leaves days_back blank
-  sort: "6-D"                  # 6-D = newest listed first (matches realtor.ca's own default for this use case)
+  sort: "6-D"                  # 6-D = newest listed first
   transaction_type_id: 2       # 2 = For Sale
   property_type_group_id: 1    # 1 = Residential
+  property_search_type_id: 0   # 0 = any property type - same as realtor.ca's own map search default
   currency: "CAD"
   fetch_listing_details: true  # visit each new listing's page for full address/agent/brokerage/description
   detail_fetch_method: "http"  # "http" = fetch listing pages with curl_cffi, reusing the browser's cookies/headers (fast);
@@ -61,6 +60,8 @@ output:
 geo:
   cache_file: "data/geo_cache.json"
   force_refresh: false     # true = ignore cache and re-resolve every city's map location
+  bbox_padding_km: 0       # widen the map area searched for towns without a realtor.ca boundary
+                           # (Bragg Creek, Langdon, ...) by this many km on each side
 
 logging:
   log_dir: "logs"
